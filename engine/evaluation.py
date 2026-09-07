@@ -9,10 +9,16 @@ bi genetski algoritam mogao da ih podešava.
 Tabla se prosleđuje kao mali ``int`` numpy niz sa istim vrednostima kao
 :class:`lib.constants.Stone` (BLACK=0, WHITE=1, EMPTY=2), da bi pretraga mogla
 jeftino da kopira i isprobava pozicije, nezavisno od table iz GUI-ja.
+
+Prebrojavanje obrazaca je optimizovano: umesto regularnih izraza koristi se
+**unapred izračunata tabela** za sve moguće prozore dužine 5 i 6 (kodirane u
+bazi 3). Skeniranje jedne linije se svodi na klizanje prozora i sabiranje
+vektora iz tabele — bez građenja niski i bez regexa. Koordinate svih linija i
+mapiranje polje→linije keširaju se po veličini table (koristi ih i inkrementalni
+evaluator u :mod:`engine.search`).
 """
 
 import json
-import re
 from pathlib import Path
 
 import numpy as np
@@ -57,18 +63,105 @@ PATTERNS = {
     "open_two": ["001100", "011000", "000110", "010100", "001010"],
     "two": ["211000", "000112", "210100", "001012", "010010"],
 }
-_PATTERN_CATS = ["five", "open_four", "four", "open_three", "three", "open_two", "two"]
 
-# unapred kompajlirani matcheri sa preklapanjem (lookahead dozvoljava da se obrasci preklapaju)
-_COMPILED = {
-    cat: [re.compile("(?=(%s))" % p) for p in pats] for cat, pats in PATTERNS.items()
-}
+# uređene kategorije obrazaca (indeks u vektoru brojača); ``fork`` koristi
+# indekse: open_four=1, four=2, open_three=3.
+CATS = ("five", "open_four", "four", "open_three", "three", "open_two", "two")
+CAT_INDEX = {name: i for i, name in enumerate(CATS)}
+NUM_CATS = len(CATS)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WEIGHTS_PATH = PROJECT_ROOT / "weights.json"
 
 
-# --- pomoćne funkcije za težine -------------------------------------------
+# --- unapred izračunate tabele obrazaca -----------------------------------
+def _build_window_table(length):
+    """Tabela vektora brojača za sve prozore date dužine (kodirane u bazi 3).
+
+    Za kod prozora ``w[0..L-1]`` (gde je ``code = sum(w[k] * 3**k)``) vraća se
+    koliko obrazaca **te dužine** iz kataloga počinje na poziciji 0 prozora.
+    Sabiranjem po svim početnim pozicijama u liniji dobija se isti rezultat kao
+    prebrojavanje preklapajućih pojava svakog obrasca (kao ranije sa regexom).
+    """
+    table = np.zeros((3 ** length, NUM_CATS), dtype=np.int64)
+    for code in range(3 ** length):
+        digits, x = [], code
+        for _ in range(length):
+            digits.append(x % 3)
+            x //= 3
+        window = "".join("012"[d] for d in digits)  # pozicija 0..L-1
+        for ci, cat in enumerate(CATS):
+            for pat in PATTERNS[cat]:
+                if len(pat) == length and window.startswith(pat):
+                    table[code, ci] += 1
+    return table
+
+
+_TABLE5 = _build_window_table(5)
+_TABLE6 = _build_window_table(6)
+
+
+# --- keš koordinata linija i mape polje→linije ----------------------------
+_LINES_CACHE = {}
+_CELL_LINES_CACHE = {}
+
+
+def _build_lines(n):
+    """Sve vrste, kolone i dijagonale (dužine >= WIN_LENGTH) kao (rows, cols) nizovi."""
+    raw = []
+    for r in range(n):                       # vrste
+        raw.append([(r, c) for c in range(n)])
+    for c in range(n):                       # kolone
+        raw.append([(r, c) for r in range(n)])
+    for start in range(n):                   # dijagonale (1, 1) — start u gornjoj vrsti
+        coords, r, c = [], 0, start
+        while r < n and c < n:
+            coords.append((r, c)); r += 1; c += 1
+        if len(coords) >= WIN_LENGTH:
+            raw.append(coords)
+    for start in range(1, n):                # dijagonale (1, 1) — start u levoj koloni
+        coords, r, c = [], start, 0
+        while r < n and c < n:
+            coords.append((r, c)); r += 1; c += 1
+        if len(coords) >= WIN_LENGTH:
+            raw.append(coords)
+    for start in range(n):                   # anti-dijagonale (1, -1) — start u gornjoj vrsti
+        coords, r, c = [], 0, start
+        while r < n and c >= 0:
+            coords.append((r, c)); r += 1; c -= 1
+        if len(coords) >= WIN_LENGTH:
+            raw.append(coords)
+    for start in range(1, n):                # anti-dijagonale (1, -1) — start u desnoj koloni
+        coords, r, c = [], start, n - 1
+        while r < n and c >= 0:
+            coords.append((r, c)); r += 1; c -= 1
+        if len(coords) >= WIN_LENGTH:
+            raw.append(coords)
+    return [
+        (np.array([p[0] for p in cs]), np.array([p[1] for p in cs])) for cs in raw
+    ]
+
+
+def get_lines(n):
+    """Vraća (keširane) koordinate svih linija za tablu veličine ``n``."""
+    if n not in _LINES_CACHE:
+        lines = _build_lines(n)
+        _LINES_CACHE[n] = lines
+        cell_lines = {}
+        for li, (rows, cols) in enumerate(lines):
+            for r, c in zip(rows.tolist(), cols.tolist()):
+                cell_lines.setdefault((r, c), []).append(li)
+        _CELL_LINES_CACHE[n] = cell_lines
+    return _LINES_CACHE[n]
+
+
+def get_cell_lines(n):
+    """Vraća (keširanu) mapu polje (r, c) → indeksi linija koje ga sadrže."""
+    get_lines(n)
+    return _CELL_LINES_CACHE[n]
+
+
+# --- weight helpers -------------------------------------------------------
 def weights_to_vector(weights):
     """Pretvara rečnik težina u uređeni numpy vektor (za GA)."""
     return np.array([float(weights[f]) for f in WEIGHT_FIELDS], dtype=float)
@@ -97,47 +190,40 @@ def save_weights(weights, path=None):
     return p
 
 
-# --- izdvajanje linija ----------------------------------------------------
-def _iter_lines(arr):
-    """Vraća (yield) svaku vrstu, kolonu i dijagonalu dužine >= WIN_LENGTH."""
-    n = arr.shape[0]
-    for i in range(n):
-        yield arr[i, :]
-        yield arr[:, i]
-    flipped = np.fliplr(arr)
-    for offset in range(-(n - 1), n):
-        d = np.diagonal(arr, offset=offset)
-        if d.size >= WIN_LENGTH:
-            yield d
-        a = np.diagonal(flipped, offset=offset)
-        if a.size >= WIN_LENGTH:
-            yield a
+# --- prebrojavanje obrazaca -----------------------------------------------
+def count_line(line, own, opp):
+    """Vektor brojača obrazaca za jednu liniju, iz perspektive ``own``.
 
-
-def _line_to_string(line, own, opp):
-    """Kodira liniju iz perspektive ``own``, dopunjenu blokirajućim zidovima."""
-    lookup = []
-    for value in line:
-        if value == own:
-            lookup.append("1")
-        elif value == opp:
-            lookup.append("2")
-        else:
-            lookup.append("0")
-    return "2" + "".join(lookup) + "2"
-
-
-def _count_patterns(arr, own, opp):
-    """Broji svaki katalogizovani obrazac za ``own`` kroz sve linije."""
-    counts = {cat: 0 for cat in PATTERNS}
-    for line in _iter_lines(arr):
-        text = _line_to_string(line, own, opp)
-        for cat, matchers in _COMPILED.items():
-            total = 0
-            for matcher in matchers:
-                total += len(matcher.findall(text))
-            counts[cat] += total
+    ``line`` je 1D niz vrednosti kamenčića; mapira se u cifre (own→1, opp→2,
+    prazno→0), dopuni zidovima sa obe strane, pa se klizećim prozorima dužine
+    5 i 6 sabiraju vektori iz unapred izračunatih tabela.
+    """
+    digit = np.where(line == own, 1, np.where(line == opp, 2, 0)).astype(np.int64)
+    d = np.empty(digit.size + 2, dtype=np.int64)
+    d[0] = 2
+    d[-1] = 2
+    d[1:-1] = digit
+    m = d.size
+    counts = np.zeros(NUM_CATS, dtype=np.int64)
+    if m >= 6:
+        c6 = (d[0:m - 5] + 3 * d[1:m - 4] + 9 * d[2:m - 3]
+              + 27 * d[3:m - 2] + 81 * d[4:m - 1] + 243 * d[5:m])
+        counts += _TABLE6[c6].sum(axis=0)
+    if m >= 5:
+        c5 = (d[0:m - 4] + 3 * d[1:m - 3] + 9 * d[2:m - 2]
+              + 27 * d[3:m - 1] + 81 * d[4:m])
+        counts += _TABLE5[c5].sum(axis=0)
     return counts
+
+
+def board_counts(arr, own, opp, n=None):
+    """Zbir brojača obrazaca za ``own`` preko svih linija cele table."""
+    if n is None:
+        n = arr.shape[0]
+    total = np.zeros(NUM_CATS, dtype=np.int64)
+    for rows, cols in get_lines(n):
+        total += count_line(arr[rows, cols], own, opp)
+    return total
 
 
 # --- pozicioni faktori ----------------------------------------------------
@@ -171,6 +257,37 @@ def _positional(arr, own, opp):
     return center_diff, conn_diff
 
 
+# --- sastavljanje ocene iz brojača ----------------------------------------
+def _pattern_weight_vector(weights):
+    """Težine kategorija obrazaca kao numpy vektor (istim redosledom kao CATS)."""
+    return np.array([weights[c] for c in CATS], dtype=float)
+
+
+def _fork_bonus(counts, weights):
+    """Bonus za višestruke istovremene pretnje (fork), izveden iz brojača."""
+    threats = int(counts[CAT_INDEX["open_three"]]
+                  + counts[CAT_INDEX["four"]]
+                  + 2 * counts[CAT_INDEX["open_four"]])
+    return weights["fork"] * max(0, threats - 1)
+
+
+def score_from_counts(own_counts, opp_counts, center_diff, conn_diff, weights):
+    """Konačna ocena iz brojača obrazaca i pozicionih razlika.
+
+    Zajednička je za punu (:func:`evaluate`) i inkrementalnu evaluaciju, pa su
+    im rezultati uvek identični.
+    """
+    patw = _pattern_weight_vector(weights)
+    own_pat = float(patw.dot(own_counts)) + _fork_bonus(own_counts, weights)
+    opp_pat = float(patw.dot(opp_counts)) + _fork_bonus(opp_counts, weights)
+    return (
+        own_pat
+        - weights["defense"] * opp_pat
+        + weights["center"] * center_diff
+        + weights["connectivity"] * conn_diff
+    )
+
+
 # --- glavna ulazna tačka --------------------------------------------------
 def evaluate(arr, own, weights):
     """Ocenjuje ``arr`` iz ugla igrača ``own``.
@@ -179,24 +296,9 @@ def evaluate(arr, own, weights):
     Protivnički obrasci se oduzimaju (skalirani ``defense`` težinom) tako da
     pretraga prirodno uči i da blokira pretnje, a ne samo da gradi svoje.
     """
+    n = arr.shape[0]
     opp = WHITE if own == BLACK else BLACK
-    own_counts = _count_patterns(arr, own, opp)
-    opp_counts = _count_patterns(arr, opp, own)
-
-    own_pat = sum(weights[c] * own_counts[c] for c in _PATTERN_CATS)
-    opp_pat = sum(weights[c] * opp_counts[c] for c in _PATTERN_CATS)
-
-    # fork = više istovremenih pretnji odjednom (dupla trojka / četvorka itd.)
-    own_threats = own_counts["open_three"] + own_counts["four"] + 2 * own_counts["open_four"]
-    opp_threats = opp_counts["open_three"] + opp_counts["four"] + 2 * opp_counts["open_four"]
-    own_pat += weights["fork"] * max(0, own_threats - 1)
-    opp_pat += weights["fork"] * max(0, opp_threats - 1)
-
+    own_counts = board_counts(arr, own, opp, n)
+    opp_counts = board_counts(arr, opp, own, n)
     center_diff, conn_diff = _positional(arr, own, opp)
-
-    return (
-        own_pat
-        - weights["defense"] * opp_pat
-        + weights["center"] * center_diff
-        + weights["connectivity"] * conn_diff
-    )
+    return score_from_counts(own_counts, opp_counts, center_diff, conn_diff, weights)

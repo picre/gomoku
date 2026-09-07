@@ -30,7 +30,7 @@ def random_individual(rng, base=None, spread=0.5):
     return np.clip(base * factors, 0.0, None)
 
 
-def evaluate_population(pop, rng, opponents=3, depth=1, radius=1, size=9):
+def evaluate_population(pop, rng, opponents=3, depth=1, radius=1, size=15):
     """Fitnes svake jedinke = poeni osvojeni protiv nasumičnih protivnika."""
     n = len(pop)
     fitness = np.zeros(n)
@@ -69,7 +69,7 @@ def mutate(vector, rng, rate=0.2, scale=0.2):
 
 
 def run_ga(pop_size=12, generations=10, opponents=3, depth=1, radius=1,
-           size=9, elite=2, mutation_rate=0.2, seed=None, out_path=None,
+           size=15, elite=2, mutation_rate=0.2, seed=None, out_path=None,
            verbose=True):
     """Pokreće genetsku pretragu i snima najbolje pronađene težine.
 

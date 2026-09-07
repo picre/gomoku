@@ -9,12 +9,12 @@ from engine.board import GomokuBoard
 from lib.constants import Stone
 
 
-def play_game(black_weights, white_weights, depth=1, radius=1, size=9,
+def play_game(black_weights, white_weights, depth=1, radius=1, size=15,
               max_moves=None, seed=None):
     """Odigra jednu partiju; vraća pobednički ``Stone`` ili ``None`` za nerešeno.
 
-    Manja tabla (podrazumevano 9x9) i plitka pretraga čine self-play dovoljno
-    brzim za veliki broj partija koje genetska pretraga zahteva.
+    Podrazumevano se igra na punoj tabli 15x15; plitka pretraga (``depth=1``)
+    drži self-play dovoljno brzim za veliki broj partija koje GA zahteva.
     """
     board = GomokuBoard(size)
     black = GomokuAI(seed=seed, depth=depth, radius=radius, weights=black_weights)
@@ -42,7 +42,7 @@ def _points(result, playing_as):
     return 1.0 if result == playing_as else 0.0
 
 
-def match_score(a_weights, b_weights, depth=1, radius=1, size=9, seed=None):
+def match_score(a_weights, b_weights, depth=1, radius=1, size=15, seed=None):
     """Rezultat ``a`` u meču od dve partije protiv ``b`` (svaka boja po jednom).
 
     Vraća vrednost u [0, 2]: 1 poen po pobedi, 0.5 po nerešenom. Igranje obe
