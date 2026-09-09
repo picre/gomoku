@@ -1,7 +1,7 @@
 """Genetski algoritam koji optimizuje težine funkcije evaluacije.
 
 Svaka jedinka je vektor heurističkih težina (videti
-:data:`engine.evaluation.WEIGHT_FIELDS`). Jedinke igraju partije jedna protiv
+:data:`engine.weights.WEIGHT_FIELDS`). Jedinke igraju partije jedna protiv
 druge; fitnes je broj partija koje osvoje. Kroz generacije, turnirska selekcija,
 uniformno ukrštanje i Gaussova mutacija traže kombinaciju težina koja igra
 najjači Gomoku.
@@ -12,15 +12,13 @@ import random
 import numpy as np
 from tqdm import trange
 
-from engine.evaluation import (
+from engine.weights import (
     DEFAULT_WEIGHTS,
-    WEIGHT_FIELDS,
     save_weights,
     vector_to_weights,
     weights_to_vector,
 )
 from genetic.arena import match_score
-from lib.constants import Stone  # noqa: F401  (zadržano radi simetrije API-ja / tipova)
 
 
 def random_individual(rng, base=None, spread=0.5):

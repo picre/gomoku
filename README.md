@@ -93,7 +93,7 @@ Kontrole u aplikaciji:
 ```
 gomoku/
 ├── play.py                 # pygame aplikacija (GUI): čovek protiv AI-ja
-├── main.py                 # (prazno) rezervisano
+├── main.py                 # ulazna tačka → pokreće play
 ├── requirements.txt        # zavisnosti
 ├── setup_env.bat           # pravljenje .venv i instalacija (Windows)
 ├── weights.json            # (opciono) evoluirane težine; pravi ih trening
@@ -101,7 +101,9 @@ gomoku/
 │   └── constants.py        # enum Stone (BLACK / WHITE / EMPTY)
 ├── engine/
 │   ├── board.py            # GomokuBoard: stanje table, potezi, provera pobede
-│   ├── evaluation.py       # heuristička ocena pozicije (obrasci + težine)
+│   ├── evaluation.py       # heuristička ocena pozicije (obrasci)
+│   ├── weights.py          # podrazumevane težine, load/save, GA vektori
+│   ├── incremental.py      # IncrementalEvaluator (delta ocena + Zobrist)
 │   ├── search.py           # Minimax + alfa-beta odsecanje
 │   └── ai.py               # GomokuAI: bira potez koristeći pretragu
 └── genetic/
@@ -118,8 +120,9 @@ Sistem je podeljen na tri sloja koji su međusobno labavo povezani:
 
 1. **Model igre** (`lib/constants.py`, `engine/board.py`) — čisto stanje i
    pravila, bez ikakve „inteligencije".
-2. **Agent** (`engine/evaluation.py`, `engine/search.py`, `engine/ai.py`) —
-   ocenjuje pozicije i pretragom bira najbolji potez.
+2. **Agent** (`engine/evaluation.py`, `engine/weights.py`, `engine/incremental.py`,
+   `engine/search.py`, `engine/ai.py`) — ocenjuje pozicije i pretragom bira
+   najbolji potez.
 3. **Optimizacija** (`genetic/`) — genetskim algoritmom traži težine heuristike
    koje daju najjaču igru, i snima ih u `weights.json`.
 
@@ -248,8 +251,9 @@ vrednost je dobra za igrača `own`, negativna za protivnika.
 ### Težine (geni)
 
 Sve gore navedeno određeno je rečnikom `weights`. Redosled gena za genetski
-algoritam definiše `WEIGHT_FIELDS` (izveden iz `DEFAULT_WEIGHTS` da se ne mogu
-razići). Podrazumevane (ručno podešene) vrednosti `DEFAULT_WEIGHTS`:
+algoritam definiše `WEIGHT_FIELDS` u `engine/weights.py` (izveden iz
+`DEFAULT_WEIGHTS` da se ne mogu razići). Podrazumevane (ručno podešene)
+vrednosti `DEFAULT_WEIGHTS`:
 
 | Gen            | Podrazumevano | Uloga                                    |
 | -------------- | ------------- | ---------------------------------------- |
@@ -265,9 +269,9 @@ razići). Podrazumevane (ručno podešene) vrednosti `DEFAULT_WEIGHTS`:
 | `fork`         | 2000          | bonus za višestruke pretnje              |
 | `defense`      | 1.1           | koliko ozbiljno shvatamo protivnika      |
 
-Pomoćne funkcije: `weights_to_vector` / `vector_to_weights` (rečnik ↔ numpy
-vektor za GA), `load_weights` (učita `weights.json` ako postoji, inače
-podrazumevane) i `save_weights` (upiše JSON).
+Pomoćne funkcije (u `engine/weights.py`): `weights_to_vector` /
+`vector_to_weights` (rečnik ↔ numpy vektor za GA), `load_weights` (učita
+`weights.json` ako postoji, inače podrazumevane) i `save_weights` (upiše JSON).
 
 ---
 
@@ -399,7 +403,7 @@ python -m genetic.train --population 20 --generations 30 --opponents 5 --depth 1
 
 Rezultat treninga. Sadrži jedan rečnik težina (ista polja kao `WEIGHT_FIELDS`).
 Nalazi se u **korenu projekta** (putanju definiše `WEIGHTS_PATH` u
-`engine/evaluation.py`). Ako postoji, `GomokuAI` je automatski učita pri
+`engine/weights.py`). Ako postoji, `GomokuAI` je automatski učita pri
 pokretanju; ako ne postoji, koriste se `DEFAULT_WEIGHTS`. Slobodno je obriši da
 se vratiš na ručno podešene vrednosti.
 
@@ -453,8 +457,8 @@ Primer sadržaja:
 ## Optimizacije pretrage
 
 Da bi pretraga bila upotrebljiva na 15×15 (i trening izvodljiv), evaluacija i
-minimax koriste nekoliko optimizacija — sve u `engine/evaluation.py` i
-`engine/search.py`:
+minimax koriste nekoliko optimizacija — u `engine/evaluation.py`,
+`engine/incremental.py` i `engine/search.py`:
 
 - **Unapred izračunate tabele obrazaca.** Umesto regularnih izraza, skor svakog
   mogućeg prozora dužine 5 i 6 (kodiranog u bazi 3) izračunat je jednom u tabele
@@ -464,7 +468,8 @@ minimax koriste nekoliko optimizacija — sve u `engine/evaluation.py` i
 - **Keširane koordinate linija** (`get_lines` / `get_cell_lines`) — sve vrste,
   kolone i dijagonale, kao i mapa polje→linije, računaju se jednom po veličini
   table.
-- **Inkrementalna (delta) evaluacija** (`IncrementalEvaluator`) — postavljanje
+- **Inkrementalna (delta) evaluacija** (`IncrementalEvaluator` u
+  `engine/incremental.py`) — postavljanje
   ili uklanjanje kamenčića menja samo **4 linije** kroz to polje, pa se tekuća
   ocena (brojači obrazaca, kontrola centra, povezanost) ažurira u O(4) linija
   umesto ponovnog skeniranja cele table u svakom čvoru. Puna

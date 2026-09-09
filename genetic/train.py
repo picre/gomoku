@@ -24,8 +24,8 @@ try:
 except (AttributeError, ValueError):
     pass
 
-from engine.evaluation import WEIGHTS_PATH  # noqa: E402
-from genetic.ga import run_ga  # noqa: E402
+from engine.weights import WEIGHTS_PATH
+from genetic.ga import run_ga
 
 
 def parse_args(argv=None):

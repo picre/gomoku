@@ -3,8 +3,8 @@ import random
 import numpy as np
 
 from engine.board import GomokuBoard
-from engine.evaluation import load_weights
 from engine.search import board_to_int, search_best_move
+from engine.weights import load_weights
 from lib.constants import Stone
 
 
@@ -18,7 +18,7 @@ class GomokuAI:
     direktno (koristi ih genetski algoritam); u suprotnom se učitavaju
     evoluirane ``weights.json`` ako postoje, uz vraćanje na razumne podrazumevane."""
 
-    def __init__(self, seed: int | None = None, depth: int = 2, radius: int = 1,
+    def __init__(self, seed: int | None = None, depth: int = 3, radius: int = 1,
                  weights: dict | None = None):
         # sopstveni RNG da partije budu ponovljive bez diranja globalnog random stanja
         self._rng = random.Random(seed)
