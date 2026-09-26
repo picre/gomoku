@@ -11,16 +11,16 @@ import numpy as np
 
 # razuman ručno izabran polazni skup; GA pretražuje u okolini ovih vrednosti
 DEFAULT_WEIGHTS = {
-    "five": 100000.0,
-    "open_four": 10000.0,
-    "four": 1000.0,
-    "open_three": 1000.0,
-    "three": 100.0,
-    "open_two": 100.0,
-    "two": 10.0,
-    "center": 3.0,
-    "connectivity": 5.0,
-    "fork": 2000.0,
+    "five": 100_000,
+    "open_four": 10_000,
+    "four": 1_000,
+    "open_three": 1_000,
+    "three": 100,
+    "open_two": 100,
+    "two": 10,
+    "center": 3,
+    "connectivity": 5,
+    "fork": 2000,
     "defense": 1.1,
 }
 

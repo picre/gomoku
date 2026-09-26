@@ -71,7 +71,7 @@ def run_ga(pop_size=12, generations=10, opponents=3, depth=1, radius=1,
            verbose=True):
     """Pokreće genetsku pretragu i snima najbolje pronađene težine.
 
-    Vraća ``(najbolje_težine_rečnik, najbolji_fitnes)`` i upisuje najbolje
+    Vraća ``(weights, fitness)`` i upisuje najbolje
     težine u ``out_path`` (podrazumevano projektni ``weights.json``).
     """
     rng = random.Random(seed)
@@ -89,10 +89,10 @@ def run_ga(pop_size=12, generations=10, opponents=3, depth=1, radius=1,
         if fitness[0] > best_fit:
             best_fit = float(fitness[0])
             best_vec = pop[0].copy()
-            # sačuvaj najbolju-do-sada pri svakom poboljšanju
+            # snima najbolju-do-sada pri svakom poboljšanju
             save_weights(vector_to_weights(best_vec), out_path)
 
-        # elitizam: prenesi najbolje jedinke nepromenjene
+        # elitizam: prenosi najbolje jedinke nepromenjene
         new_pop = [pop[i].copy() for i in range(min(elite, pop_size))]
         while len(new_pop) < pop_size:
             p1 = tournament_select(pop, fitness, rng)

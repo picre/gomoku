@@ -81,9 +81,9 @@ Kontrole u aplikaciji:
 
 | Unos          | Radnja                                        |
 | ------------- | --------------------------------------------- |
-| Levi klik     | postavi kamenčić / izaberi opciju u meniju    |
+| Levi klik     | postavljanje kamenčića / izbor opcije u meniju |
 | `1` / `2`     | meni: ti prvi / AI prvi                       |
-| `R`           | nazad na početni meni                         |
+| `R`           | povratak na početni meni                      |
 | `Esc` / close | izlaz                                         |
 
 ---
@@ -127,7 +127,7 @@ Sistem je podeljen na tri sloja koji su međusobno labavo povezani:
    koje daju najjaču igru, i snima ih u `weights.json`.
 
 Tok podataka: `play.py` (GUI) drži `GomokuBoard` i poziva `GomokuAI.choose_move`.
-`GomokuAI` prevede tablu u lagani `int` niz i pozove `search_best_move`
+`GomokuAI` prevodi tablu u lagani `int` niz i poziva `search_best_move`
 (minimax), koji u listovima stabla poziva `evaluate` (heuristika sa težinama).
 Genetski algoritam iste te komponente koristi za self-play i podešavanje težina.
 
@@ -185,20 +185,20 @@ kopira i menja pozicije, pa je to znatno brže.
 
 ### Prepoznavanje obrazaca
 
-Svaka **linija** table (svaka vrsta, kolona i dijagonala dužine ≥ 5) pretvara se
+Svaki **span** (pravac) table — vrsta, kolona ili dijagonala dužine ≥ 5 — pretvara se
 u nisku iz ugla igrača koga ocenjujemo:
 
 - `'1'` — sopstveni kamenčić,
 - `'2'` — protivnički kamenčić **ili zid** (ivica table),
 - `'0'` — prazno polje.
 
-Linija se sa obe strane dopunjava sa `'2'` da bi ivice table brojale kao blokada
+Span se sa obe strane dopunjava sa `'2'` da bi ivice table brojale kao blokada
 (npr. otvorena trojka uz ivicu više nije „otvorena").
 
-Zatim se u svakoj liniji broje obrasci iz kataloga `PATTERNS`, klizanjem
-prozora dužine 5 i 6 preko **unapred izračunatih tabela** (`_TABLE5`, `_TABLE6`);
-obrasci se broje sa **preklapanjem** (svaka početna pozicija). Više o samoj
-tehnici u odeljku [Optimizacije pretrage](#optimizacije-pretrage). Kategorije:
+Zatim se u svakom span-u broje obrasci iz kataloga `IMPORTANT_PATTERNS`, klizanjem
+**linija** dužine 5 i prozora dužine 6 preko **unapred izračunatih tabela**
+(`_TABLE5`, `_TABLE6`); obrasci se broje sa **preklapanjem** (svaka početna
+pozicija). Više o samoj tehnici u odeljku [Optimizacije pretrage](#optimizacije-pretrage). Kategorije:
 
 | Kategorija    | Značenje                                   | Primeri obrazaca                        |
 | ------------- | ------------------------------------------ | --------------------------------------- |
@@ -210,7 +210,7 @@ tehnici u odeljku [Optimizacije pretrage](#optimizacije-pretrage). Kategorije:
 | `open_two`    | otvorena dvojka                            | `001100`, `011000`, `010100`, ...       |
 | `two`         | dvojka                                     | `211000`, `210100`, `010010`, ...       |
 
-`_count_patterns` prolazi kroz sve linije i broji pojave svake kategorije za
+`board_counts` prolazi kroz sve span-ove i broji pojave svake kategorije za
 zadatog igrača.
 
 ### Pozicioni faktori
@@ -299,7 +299,7 @@ Ključni delovi:
   4. izjednačene poteze bira nasumično preko prosleđenog `rng` (partije nisu
      potpuno deterministične).
 
-Parametri: `depth` (dubina; podrazumevano 2 u igri, 1 u treningu radi brzine),
+Parametri: `depth` (dubina; podrazumevano 3 u igri, 1 u treningu radi brzine),
 `radius` (širina razmatranja kandidata; podrazumevano 1).
 
 ---
@@ -309,7 +309,7 @@ Parametri: `depth` (dubina; podrazumevano 2 u igri, 1 u treningu radi brzine),
 `GomokuAI` je tanak omotač koji spaja tablu, pretragu i težine:
 
 ```python
-GomokuAI(seed=None, depth=2, radius=1, weights=None)
+GomokuAI(seed=None, depth=3, radius=1, weights=None)
 ```
 
 - `seed` — sopstveni RNG radi ponovljivosti (bez diranja globalnog `random`).
@@ -320,9 +320,9 @@ GomokuAI(seed=None, depth=2, radius=1, weights=None)
 `choose_move(board)`:
 
 1. `board_to_int(board)` → `int` niz,
-2. odredi ko je na potezu (`current_stone`),
-3. `search_best_move(...)` vrati najbolji potez,
-4. ako pretraga ništa ne vrati (krajnji slučaj), bira nasumičan legalan potez.
+2. određuje ko je na potezu (`current_stone`),
+3. `search_best_move(...)` vraća najbolji potez,
+4. ako pretraga ništa ne vraća (krajnji slučaj), bira nasumičan legalan potez.
 
 `legal_moves(board)` je pomoćna statička metoda koja vraća sva prazna polja.
 
@@ -340,8 +340,8 @@ meri se brojem partija koje osvoji protiv drugih jedinki.
 
 ### `arena.py` — self-play
 
-- `play_game(black_weights, white_weights, depth, radius, size, ...)` — odigra
-  jednu partiju između dva agenta (svaki sa svojim težinama) i vrati pobednički
+- `play_game(black_weights, white_weights, depth, radius, size, ...)` — odigrava
+  jednu partiju između dva agenta (svaki sa svojim težinama) i vraća pobednički
   `Stone` ili `None` za nerešeno. Trening podrazumevano koristi punu tablu
   (`size=15`) i plitku pretragu (`depth=1`) radi brzine.
 - `match_score(a, b, ...)` — meč od **dve partije** (svaka strana jednom igra
@@ -355,7 +355,7 @@ Glavna petlja `run_ga(...)` radi sledeće:
 1. **Inicijalizacija populacije** — `random_individual` uzima podrazumevane
    težine i množi ih nasumičnim faktorom u opsegu `1 ± spread` (podrazumevano
    ±0.5), uz odsecanje na nenegativne vrednosti.
-2. **Evaluacija (fitnes)** — `evaluate_population`: svaka jedinka odigra
+2. **Evaluacija (fitnes)** — `evaluate_population`: svaka jedinka odigrava
    `opponents` mečeva protiv nasumično izabranih drugih jedinki; poeni se sabiraju.
 3. **Selekcija** — `tournament_select`: bira se najbolja od `k` (=3) nasumičnih
    kandidatkinja.
@@ -430,27 +430,27 @@ Primer sadržaja:
 ## Tok jednog poteza (end-to-end)
 
 1. Igrač klikne polje → `Game._on_click` → `Game.human_move`.
-2. `human_move` odigra potez (`board.make_move`) i proveri kraj partije.
+2. `human_move` odigrava potez (`board.make_move`) i proverava kraj partije.
 3. Ako partija nije gotova, poziva se `Game.ai_move`.
 4. `ai_move` → `GomokuAI.choose_move(board)`.
-5. `choose_move` prevede tablu u `int` niz i pozove `search_best_move`.
-6. `search_best_move` (minimax + αβ) u listovima poziva `evaluate`, koja prebroji
-   obrasce i vrati ocenu prema `weights`.
-7. Najbolji potez se vrati i odigra; ekran se ponovo iscrta.
+5. `choose_move` prevodi tablu u `int` niz i poziva `search_best_move`.
+6. `search_best_move` (minimax + αβ) u listovima poziva `evaluate`, koja prebrojava
+   obrasce i vraća ocenu prema `weights`.
+7. Najbolji potez se vraća i odigrava; ekran se ponovo iscrtava.
 
 ---
 
 ## Podešavanje i saveti
 
 - **Jačina vs. brzina:** veći `depth` daje jaču ali sporiju igru. Na 15×15 je
-  `depth=2` dobar kompromis; `depth=3+` zahteva bolje odsecanje/ograničenje
+  `depth=3` podrazumevani kompromis; dublje zahteva bolje odsecanje/ograničenje
   kandidata (`radius`).
 - **`radius`:** `radius=1` je najbrži i obično dovoljan; `radius=2` razmatra više
   poteza (šire kombinacije) ali je sporiji.
 - **Trening podrazumevano ide na 15×15** i podrazumeva mnogo partija, pa traje.
-  Za brzu proveru da sve radi možeš privremeno smanjiti tablu (`--size 9`); za
-  jače težine povećaj populaciju, broj generacija i `--opponents`.
-- **Ponovljivost:** postavi `--seed` za trening i `seed` u `GomokuAI` za partije.
+  Za brzu proveru da sve radi može se privremeno smanjiti tabla (`--size 9`); za
+  jače težine povećavaju se populacija, broj generacija i `--opponents`.
+- **Ponovljivost:** zadaje se `--seed` za trening i `seed` u `GomokuAI` za partije.
 
 ---
 
@@ -462,16 +462,16 @@ minimax koriste nekoliko optimizacija — u `engine/evaluation.py`,
 
 - **Unapred izračunate tabele obrazaca.** Umesto regularnih izraza, skor svakog
   mogućeg prozora dužine 5 i 6 (kodiranog u bazi 3) izračunat je jednom u tabele
-  (`_TABLE5`, `_TABLE6`). Prebrojavanje linije je tada klizanje prozora +
+  (`_TABLE5`, `_TABLE6`). Prebrojavanje span-a je tada klizanje linija/prozora +
   sabiranje vektora iz tabele — bez građenja niski i bez regexa. Rezultati su
   **identični** ranijem regex pristupu (iste kategorije i brojevi).
-- **Keširane koordinate linija** (`get_lines` / `get_cell_lines`) — sve vrste,
-  kolone i dijagonale, kao i mapa polje→linije, računaju se jednom po veličini
-  table.
+- **Koordinate span-ova** (`get_spans` / `get_cell_spans`,
+  `_SPANS` / `_CELL_SPANS`) — sve vrste, kolone i dijagonale, kao i
+  mapa polje→span, računaju se jednom po veličini table.
 - **Inkrementalna (delta) evaluacija** (`IncrementalEvaluator` u
   `engine/incremental.py`) — postavljanje
-  ili uklanjanje kamenčića menja samo **4 linije** kroz to polje, pa se tekuća
-  ocena (brojači obrazaca, kontrola centra, povezanost) ažurira u O(4) linija
+  ili uklanjanje kamenčića menja samo **4 span-a** kroz to polje, pa se tekuća
+  ocena (brojači obrazaca, kontrola centra, povezanost) ažurira u O(4) span-ova
   umesto ponovnog skeniranja cele table u svakom čvoru. Puna
   `evaluate(...)` je zadržana kao referenca i za GA, i daje isti rezultat kao
   inkrementalna `value(...)`.
@@ -482,8 +482,8 @@ minimax koriste nekoliko optimizacija — u `engine/evaluation.py`,
 - **Uređivanje poteza** — na korenu i u dubljim čvorovima potezi se sortiraju po
   plitkoj (inkrementalnoj) oceni radi jačeg alfa-beta odsecanja.
 
-Orijentaciono, na praznijoj sredini table jedan potez na `depth=2` traje ~0.1 s,
-a `depth=3` je i dalje interaktivan.
+Orijentaciono, na praznijoj sredini table jedan potez na `depth=3` je i dalje
+interaktivan; `depth=2` je brži ako treba ubrzati igru.
 
 ---
 

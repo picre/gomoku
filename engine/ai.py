@@ -16,10 +16,16 @@ class GomokuAI:
     zasnovanom na obrascima (videti :mod:`engine.search` i
     :mod:`engine.evaluation`). Heurističke ``weights`` mogu se proslediti
     direktno (koristi ih genetski algoritam); u suprotnom se učitavaju
-    evoluirane ``weights.json`` ako postoje, uz vraćanje na razumne podrazumevane."""
+    evoluirane ``weights.json`` ako postoje, uz vraćanje na razumne
+    podrazumevane."""
 
-    def __init__(self, seed: int | None = None, depth: int = 3, radius: int = 1,
-                 weights: dict | None = None):
+    def __init__(
+        self,
+        seed: int | None = None,
+        depth: int = 3,
+        radius: int = 1,
+        weights: dict | None = None,
+    ):
         # sopstveni RNG da partije budu ponovljive bez diranja globalnog random stanja
         self._rng = random.Random(seed)
         self.depth = depth
@@ -27,10 +33,10 @@ class GomokuAI:
         self.weights = weights if weights is not None else load_weights()
 
     def choose_move(self, board: GomokuBoard) -> tuple[int, int] | None:
-        """Vraća najbolji potez za igrača koji je na potezu (ili None ako nema poteza).
+        """Vraća najbolji potez za igrača koji je na potezu (ili None ako nema).
 
-        Tablu prevodi u int niz i prepušta izbor minimax pretrazi; ako pretraga
-        ništa ne vrati, bira nasumičan legalan potez kao rezervu."""
+        Tablu prevodi u int niz i prepušta izbor minimax pretrazi.
+        """
         arr = board_to_int(board)
         ai_stone = int(board.current_stone.value)
         move = search_best_move(
@@ -38,9 +44,11 @@ class GomokuAI:
             depth=self.depth, radius=self.radius, rng=self._rng,
         )
         if move is None:
-            # vrati se na nasumičan legalan potez ako pretraga ništa nije našla
-            legal = self.legal_moves(board)
-            return self._rng.choice(legal) if legal else None
+            if self.legal_moves(board):
+                raise RuntimeError(
+                    "pretraga nije vratila potez iako ima praznih polja"
+                )
+            return None
         return (int(move[0]), int(move[1]))
 
     @staticmethod

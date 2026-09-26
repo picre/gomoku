@@ -1,0 +1,31 @@
+---
+description: Komentari, docstring-ovi i čitljiva imena
+alwaysApply: true
+---
+
+# Komentari i čitljivost
+
+## Jezik komentara
+
+- Komentari i docstring-ovi na **srpskom** sa dijakriticima (č, ć, š, đ, ž).
+- Kod na engleskom.
+
+## Akademski oblik
+
+- Opisuj u **3. licu jednine prezenta** (šta kod radi), ne u imperativu ni u 1. licu.
+- Dobro: `Pretvara listu…`, `Vraća koordinate…`, `Proverava horizontalu…`
+- Loše: `Pretvori listu…`, `Proveri…`, `Gledamo da li…`, `Sačuvaj…`
+- Ista forma važi i za korake u docstring-u (`1. pretvara…`, ne `1. pretvori…`).
+
+## Kada komentarisati
+
+- Svaka komplikovanija linija ili blok ima **kratak komentar** šta radi i zašto.
+- Ne komentarisati očigledno (`i += 1` → ne treba „povećava i“).
+- Preferirati komentar iznad bloka, ne u sredini gustog izraza.
+
+## Imena
+
+- Razumljiva imena (`span`, `count_span`, `weights`).
+- Bez kryptičnih skraćenica (`tmp2`, `x1`), osim gde je lokalno i očigledno
+  (`r`, `c` za red/kolonu; `n` za veličinu table).
+- Preferirati jasne, kraće funkcije umesto gustih one-liner-a.

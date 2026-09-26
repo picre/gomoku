@@ -28,6 +28,8 @@ def play_game(black_weights, white_weights, depth=1, radius=1, size=15,
         agent = black if board.current_stone == Stone.BLACK else white
         move = agent.choose_move(board)
         if move is None:
+            if not board.is_a_tie():
+                raise RuntimeError("AI nije vratio potez iako tabla nije puna")
             break
         board.make_move(*move)
         if board.player_has_won():

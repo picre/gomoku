@@ -1,7 +1,7 @@
 """Inkrementalna evaluacija pozicije tokom pretrage.
 
 :class:`IncrementalEvaluator` održava brojače obrazaca, kontrolu centra,
-povezanost, skup zauzetih polja i Zobrist heš, i ažurira ih u O(4) linija pri
+povezanost, skup zauzetih polja i Zobrist heš, i ažurira ih u O(4) span-a pri
 svakom ``place``/``remove``. Koristi ga Minimax u :mod:`engine.search`.
 """
 
@@ -12,34 +12,34 @@ import numpy as np
 from engine.evaluation import (
     BLACK,
     EMPTY,
+    NUM_CATS,
     WHITE,
     _adjacent_pairs,
-    count_line,
-    get_cell_lines,
-    get_lines,
+    count_span,
+    get_cell_spans,
+    get_spans,
     score_from_counts,
-    NUM_CATS,
 )
 
 NEIGHBORS = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 
-# keširane Zobrist tabele po veličini table
-_ZOBRIST_CACHE = {}
+# Zobrist tabele po veličini table
+_ZOBRIST = {}
 
 
 def get_zobrist(n):
-    """Vraća (keširanu) Zobrist tabelu slučajnih ključeva oblika [n][n][2]."""
-    if n not in _ZOBRIST_CACHE:
+    """Vraća Zobrist tabelu slučajnih ključeva oblika [n][n][2]."""
+    if n not in _ZOBRIST:
         rng = random.Random(0xC0FFEE ^ n)
-        _ZOBRIST_CACHE[n] = [
+        _ZOBRIST[n] = [
             [[rng.getrandbits(63) for _ in range(2)] for _ in range(n)]
             for _ in range(n)
         ]
-    return _ZOBRIST_CACHE[n]
+    return _ZOBRIST[n]
 
 
 class IncrementalEvaluator:
-    """Održava tekuću ocenu pozicije i ažurira je pri svakom potezu u O(4) linija.
+    """Održava tekuću ocenu pozicije i ažurira je pri svakom potezu u O(4) span-a.
 
     Deli isti niz (``arr``) sa pretragom i menja ga kroz :meth:`place`/:meth:`remove`.
     Uz brojače obrazaca po perspektivi, održava i kontrolu centra, povezanost,
@@ -47,19 +47,19 @@ class IncrementalEvaluator:
     """
 
     def __init__(self, arr, weights):
-        """Inicijalizuje evaluator iz zadate pozicije (jednom skenira sve linije)."""
+        """Inicijalizuje evaluator iz zadate pozicije (jednom skenira sve span-ove)."""
         self.arr = arr
         self.weights = weights
         n = arr.shape[0]
         self.n = n
-        self.lines = get_lines(n)
-        self.cell_lines = get_cell_lines(n)
+        self.spans = get_spans(n)
+        self.cell_spans = get_cell_spans(n)
         self.center_ref = (n - 1) / 2.0
         self.zob = get_zobrist(n)
 
-        self.line_counts = {
-            BLACK: [None] * len(self.lines),
-            WHITE: [None] * len(self.lines),
+        self.span_counts = {
+            BLACK: [None] * len(self.spans),
+            WHITE: [None] * len(self.spans),
         }
         self.total = {BLACK: np.zeros(NUM_CATS, dtype=np.int64),
                       WHITE: np.zeros(NUM_CATS, dtype=np.int64)}
@@ -68,14 +68,14 @@ class IncrementalEvaluator:
         self.occupied = set()
         self.hash = 0
 
-        # brojači obrazaca po linijama i njihov zbir
-        for li, (rows, cols) in enumerate(self.lines):
-            line = arr[rows, cols]
+        # brojači obrazaca po span-ovima i njihov zbir
+        for si, (rows, cols) in enumerate(self.spans):
+            span = arr[rows, cols]
             for color in (BLACK, WHITE):
                 opp = WHITE if color == BLACK else BLACK
-                vec = count_line(line, color, opp)
-                self.line_counts[color][li] = vec
-                self.total[color] += vec
+                counts = count_span(span, color, opp)
+                self.span_counts[color][si] = counts
+                self.total[color] += counts
 
         # kontrola centra, zauzetost i Zobrist heš iz postojećih kamenčića
         ys, xs = np.nonzero(arr != EMPTY)
@@ -93,7 +93,7 @@ class IncrementalEvaluator:
         return self.n - (abs(r - self.center_ref) + abs(c - self.center_ref))
 
     def _neighbors(self, r, c, stone):
-        """Broj susednih polja (8 pravaca) koja sadrže kamenčić ``stone``."""
+        """Broj susednih polja (8 suseda) koja sadrže kamenčić ``stone``."""
         n, arr, cnt = self.n, self.arr, 0
         for dr, dc in NEIGHBORS:
             rr, cc = r + dr, c + dc
@@ -102,15 +102,15 @@ class IncrementalEvaluator:
         return cnt
 
     def _recompute_cell(self, r, c):
-        """Preračunava brojače obrazaca za sve linije koje prolaze kroz (r, c)."""
-        for li in self.cell_lines.get((r, c), ()):
-            rows, cols = self.lines[li]
-            line = self.arr[rows, cols]
+        """Preračunava brojače obrazaca za sve span-ove koje prolaze kroz (r, c)."""
+        for si in self.cell_spans.get((r, c), ()):
+            rows, cols = self.spans[si]
+            span = self.arr[rows, cols]
             for color in (BLACK, WHITE):
                 opp = WHITE if color == BLACK else BLACK
-                vec = count_line(line, color, opp)
-                self.total[color] += vec - self.line_counts[color][li]
-                self.line_counts[color][li] = vec
+                counts = count_span(span, color, opp)
+                self.total[color] += counts - self.span_counts[color][si]
+                self.span_counts[color][si] = counts
 
     def place(self, r, c, stone):
         """Postavlja ``stone`` na (r, c) i inkrementalno ažurira sve pokazatelje."""

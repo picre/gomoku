@@ -13,12 +13,12 @@ import argparse
 import os
 import sys
 
-# obezbedi da koren projekta bude uvoziv kada se pokreće kao obična skripta
+# obezbeđuje da koren projekta bude uvoziv kada se pokreće kao obična skripta
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-# ispisuj UTF-8 (srpska slova) i na Windows konzoli koja podrazumeva cp1252
+# ispisuje UTF-8 (srpska slova) i na Windows konzoli koja podrazumeva cp1252
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except (AttributeError, ValueError):
@@ -30,17 +30,48 @@ from genetic.ga import run_ga
 
 def parse_args(argv=None):
     """Definiše i parsira argumente komandne linije za trening."""
-    parser = argparse.ArgumentParser(description="Optimizacija težina Gomoku evaluacije genetskim algoritmom.")
-    parser.add_argument("--population", type=int, default=12, help="broj jedinki po generaciji")
-    parser.add_argument("--generations", type=int, default=10, help="broj generacija")
-    parser.add_argument("--opponents", type=int, default=3, help="mečeva po jedinki u svakoj generaciji")
-    parser.add_argument("--depth", type=int, default=1, help="dubina minimax pretrage tokom self-play-a")
-    parser.add_argument("--radius", type=int, default=1, help="radijus kandidat-poteza oko kamenčića")
-    parser.add_argument("--size", type=int, default=15, help="veličina table za self-play partije")
-    parser.add_argument("--elite", type=int, default=2, help="jedinke koje se prenose nepromenjene")
-    parser.add_argument("--mutation-rate", type=float, default=0.2, help="verovatnoća mutacije po genu")
-    parser.add_argument("--seed", type=int, default=None, help="seme RNG-a radi ponovljivosti")
-    parser.add_argument("--out", type=str, default=None, help="izlazna JSON putanja (podrazumevano: weights.json)")
+    parser = argparse.ArgumentParser(
+        description="Optimizacija težina Gomoku evaluacije genetskim algoritmom.",
+    )
+    parser.add_argument(
+        "--population", type=int, default=12,
+        help="broj jedinki po generaciji",
+    )
+    parser.add_argument(
+        "--generations", type=int, default=10, help="broj generacija",
+    )
+    parser.add_argument(
+        "--opponents", type=int, default=3,
+        help="mečeva po jedinki u svakoj generaciji",
+    )
+    parser.add_argument(
+        "--depth", type=int, default=1,
+        help="dubina minimax pretrage tokom self-play-a",
+    )
+    parser.add_argument(
+        "--radius", type=int, default=1,
+        help="radijus kandidat-poteza oko kamenčića",
+    )
+    parser.add_argument(
+        "--size", type=int, default=15,
+        help="veličina table za self-play partije",
+    )
+    parser.add_argument(
+        "--elite", type=int, default=2,
+        help="jedinke koje se prenose nepromenjene",
+    )
+    parser.add_argument(
+        "--mutation-rate", type=float, default=0.2,
+        help="verovatnoća mutacije po genu",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=None,
+        help="seme RNG-a radi ponovljivosti",
+    )
+    parser.add_argument(
+        "--out", type=str, default=None,
+        help="izlazna JSON putanja (podrazumevano: weights.json)",
+    )
     return parser.parse_args(argv)
 
 

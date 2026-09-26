@@ -9,7 +9,7 @@ samo prazna polja u okviru ``radius`` od nekog postojećeg kamenčića.
 Optimizacije koje ubrzavaju pretragu:
 
 * **Inkrementalna evaluacija** (:class:`~engine.incremental.IncrementalEvaluator`) —
-  postavljanje ili uklanjanje kamenčića menja samo 4 linije kroz to polje.
+  postavljanje ili uklanjanje kamenčića menja samo 4 span-a kroz to polje.
 * **Transpoziciona tabela** (Zobrist heš) — kešira ocene pozicija.
 * **Uređivanje poteza** — potezi se sortiraju po plitkoj oceni radi jačeg
   alfa-beta odsecanja.
@@ -17,7 +17,7 @@ Optimizacije koje ubrzavaju pretragu:
 
 import numpy as np
 
-from engine.evaluation import BLACK, EMPTY, WHITE, WIN_LENGTH
+from engine.evaluation import BLACK, CAT_INDEX, EMPTY, WHITE, WIN_LENGTH
 from engine.incremental import IncrementalEvaluator
 
 INF = float("inf")
@@ -100,6 +100,23 @@ class _Searcher:
         scored.sort(key=lambda item: item[0], reverse=maximizing)
         return [move for _, move in scored]
 
+    def _leaf_value(self, maximizing, player):
+        """Ocena u listu: forsirani ishod preko brojača pretnji, inače heuristika.
+
+        Na neparnoj dubini obična evaluacija ne vidi otvorenu četvorku: AI odbrani
+        jedan kraj, pretraga stane, a drugi kraj i dalje pobeđuje. Zato u listu
+        proverava se da li igrač na potezu već ima četvorku / otvorenu četvorku.
+        """
+        four_i = CAT_INDEX["four"]
+        open_four_i = CAT_INDEX["open_four"]
+        mine = self.ev.total[player]
+        if int(mine[open_four_i]) > 0 or int(mine[four_i]) > 0:
+            return WIN_SCORE if maximizing else -WIN_SCORE
+        other = WHITE if player == BLACK else BLACK
+        if int(self.ev.total[other][open_four_i]) > 0:
+            return -WIN_SCORE if maximizing else WIN_SCORE
+        return self.ev.value(self.ai)
+
     def search(self, depth, alpha, beta, maximizing, player):
         """Rekurzivni alfa-beta minimax; vraća ocenu iz ugla ``self.ai``."""
         key = (self.ev.hash, maximizing)
@@ -117,7 +134,7 @@ class _Searcher:
 
         moves = self.ev.candidates(self.radius)
         if depth == 0 or not moves:
-            return self.ev.value(self.ai)
+            return self._leaf_value(maximizing, player)
 
         alpha0, beta0 = alpha, beta
         other = WHITE if player == BLACK else BLACK
@@ -176,6 +193,8 @@ def search_best_move(arr, ai_stone, weights, depth=3, radius=1, rng=None):
     ev = IncrementalEvaluator(arr, weights)
     moves = ev.candidates(radius)
     if not moves:
+        if np.any(arr == EMPTY):
+            raise RuntimeError("nema kandidat-poteza iako tabla nije puna")
         return None
 
     # momentalna pobeda ako postoji
@@ -197,20 +216,20 @@ def search_best_move(arr, ai_stone, weights, depth=3, radius=1, rng=None):
 
     searcher = _Searcher(ev, ai_stone, radius)
     best, best_moves = -INF, []
-    alpha, beta = -INF, INF
+    # Na korenu svaki kandidat ide sa punim prozorom (-inf, +inf).
+    # Ako se alpha prenosi sa prethodnog poteza, fail-soft alfa-beta često
+    # vraća istu granicu i za loše poteze, pa RNG izjednačava dobar i loš potez.
     for (r, c) in ordered:
         ev.place(r, c, ai_stone)
         if _wins(ev.arr, r, c):
             val = WIN_SCORE + depth
         else:
-            val = searcher.search(depth - 1, alpha, beta, False, opp)
+            val = searcher.search(depth - 1, -INF, INF, False, opp)
         ev.remove(r, c)
         if val > best:
             best, best_moves = val, [(r, c)]
         elif val == best:
             best_moves.append((r, c))
-        if best > alpha:
-            alpha = best
 
     if rng is not None:
         return rng.choice(best_moves)

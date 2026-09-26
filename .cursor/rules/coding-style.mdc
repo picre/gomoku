@@ -1,0 +1,20 @@
+---
+description: Formatiranje, importi i dužina linije
+alwaysApply: true
+---
+
+# Stil koda
+
+- Konzistentno formatiranje kroz ceo projekat.
+- Posle izmena zadrži isti stil uvlaka i razmaka kao u okolnom fajlu.
+
+## Importi
+
+- Grupiši: (1) standardna biblioteka, (2) treće strane, (3) lokalni moduli.
+- Unutar grupe sortiraj abecedno.
+- Između grupa ostavi prazan red.
+
+## Dužina linije
+
+- Ciljaj **najviše 100 karaktera**.
+- Duže linije prelomi čitljivo (ne zbog forsiranja jednog izraza).

@@ -1,0 +1,28 @@
+---
+description: Terminologija i arhitekturni pojmovi (span, line, direction)
+alwaysApply: true
+---
+
+# Arhitektura / terminologija
+
+Koristi konzistentna imena u kodu:
+
+| Engleski (kod) | Srpski | Značenje |
+|----------------|--------|----------|
+| `span` | pravac | cela vrsta / kolona / dijagonala |
+| `line` | linija | segment dužine 5 unutar span-a |
+| `direction` / `(dr, dc)` | smer | npr. u `board` / `search` |
+
+## Slojevi (orientacija)
+
+- `lib/` — konstante (`Stone`)
+- `engine/board.py` — pravila igre
+- `engine/evaluation.py` — obrasci, puna ocena, span-ovi
+- `engine/incremental.py` — inkrementalna ocena za pretragu
+- `engine/search.py` — Minimax + αβ
+- `engine/ai.py` — omotač agenta
+- `engine/weights.py` — težine / GA geni
+- `genetic/` — trening težina
+- `play.py` — pygame GUI
+
+Ne uvoditi nove apstrakcije ili pakete bez potrebe; prati postojeću podelu.

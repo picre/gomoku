@@ -4,9 +4,9 @@ Gomoku — pygame aplikacija. Igraj protiv AI-ja.
 Crni uvek igra prvi. Pre svake partije se bira ko igra prvi - igrač ili AI.
 
 Kontrole:
-    Levi klik   - postavi kamenčić / izaberi opciju u meniju
+    Levi klik   - postavljanje kamenčića / izbor opcije u meniju
     1 / 2       - meni: Čovek prvi / AI prvi
-    R           - nazad na početni meni
+    R           - povratak na početni meni
     Esc / close - izlaz
 """
 
@@ -32,7 +32,7 @@ STONE_R = CELL // 2 - 3          # broj piksela poluprečnika kamenčića
 WOOD = (222, 184, 135)            # boja drveta
 LINE = (60, 40, 20)               # boja linija mreže
 BLACK = (20, 20, 20)              # boja crnog kamenčića
-WHITE = (240, 240, 240)           # boja belega kamenčića
+WHITE = (240, 240, 240)           # boja belog kamenčića
 SHADOW = (0, 0, 0, 60)            # boja senke kamenčića
 MARKER = (200, 40, 40)            # boja crvene oznake na poslednjem odigranom potezu
 PANEL_BG = (34, 30, 26)           # boja pozadine statusne trake
@@ -52,7 +52,7 @@ def px_to_grid(x, y):
     col = round((x - MARGIN) / CELL)
     row = round((y - MARGIN) / CELL)
     if 0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE:
-        # odbaci klikove koji su daleko od preseka
+        # odbacuje klikove koji su daleko od preseka
         cx, cy = grid_to_px(row, col)
         if (x - cx) ** 2 + (y - cy) ** 2 <= (CELL // 2) ** 2:
             return row, col
@@ -108,27 +108,31 @@ class Game:
             self.game_over = True
 
     def human_move(self, row, col):
-        """Obrađuje potez čoveka; ako je legalan, odigra ga i prepušta potez AI-ju."""
+        """Obrađuje potez čoveka; ako je legalan, odigrava ga i prepušta potez AI-ju."""
         if self.game_over or self.board.current_stone != self.human:
             return
         if not self.board.is_valid_move(row, col):
             return
         self.apply(row, col)
+        print(f"Igrač: ({row}, {col})")
         self.end_if_finished()
         if not self.game_over:
             self.ai_move()
 
     def ai_move(self):
-        """Traži AI potez i odigra ga (uz kratku pauzu radi vizuelnog utiska)."""
-        # odmah iscrtaj da se prethodni kamenčić vidi pre nego što AI „razmišlja”
+        """Traži AI potez i odigrava ga (uz kratku pauzu radi vizuelnog utiska)."""
+        # odmah iscrtava da se prethodni kamenčić vidi pre nego što AI „razmišlja”
         self.draw()
         pygame.display.flip()
         pygame.time.wait(180)
         move = self.ai.choose_move(self.board)
         if move is None:
+            if not self.board.is_a_tie():
+                raise RuntimeError("AI nije vratio potez iako tabla nije puna")
             self.game_over = True
             return
         self.apply(*move)
+        print(f"AI: ({move[0]}, {move[1]})")
         self.end_if_finished()
 
     # --- iscrtavanje ------------------------------------------------------
