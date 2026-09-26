@@ -11,6 +11,9 @@ alwaysApply: true
 - Ne koristi „ošišanu“ latinicu (npr. `citanje` umesto `čitanje`).
 - Komentari i docstring-ovi u **akademskom obliku**: 3. lice jednine prezenta
   (`Pretvara…`, `Vraća…`), ne imperativ (`Pretvori…`) ni 1. lice (`Gledamo…`).
+- U komentarima/docs: **pravac** (ne „span“); u kodu identifikator ostaje `span`.
+- U komentarima/docstring-ovima koristi jednostruke navodnike oko imena
+  (`'weights'`), ne backtick-ove.
 
 ## Dokumentacija
 

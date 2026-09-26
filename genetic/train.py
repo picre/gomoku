@@ -5,7 +5,7 @@ Pokreće se iz korena projekta, kao modul ili kao skripta::
     python -m genetic.train --generations 15 --population 16
     python genetic/train.py --generations 15 --population 16
 
-Najbolje pronađene težine upisuju se u ``weights.json`` u korenu projekta, koje
+Najbolje pronađene težine upisuju se u 'weights.json' u korenu projekta, koje
 igra (i AI) automatski preuzimaju pri sledećem pokretanju.
 """
 
@@ -25,7 +25,7 @@ except (AttributeError, ValueError):
     pass
 
 from engine.weights import WEIGHTS_PATH
-from genetic.ga import run_ga
+from genetic.genetic_algorithm import run_ga
 
 
 def parse_args(argv=None):

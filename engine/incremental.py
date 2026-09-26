@@ -1,8 +1,8 @@
 """Inkrementalna evaluacija pozicije tokom pretrage.
 
-:class:`IncrementalEvaluator` održava brojače obrazaca, kontrolu centra,
-povezanost, skup zauzetih polja i Zobrist heš, i ažurira ih u O(4) span-a pri
-svakom ``place``/``remove``. Koristi ga Minimax u :mod:`engine.search`.
+'IncrementalEvaluator' održava brojače obrazaca, kontrolu centra,
+povezanost, skup zauzetih polja i Zobrist heš, i ažurira ih u O(4) pravca pri
+svakom 'place'/'remove'. Koristi ga Minimax u 'engine.search'.
 """
 
 import random
@@ -12,7 +12,7 @@ import numpy as np
 from engine.evaluation import (
     BLACK,
     EMPTY,
-    NUM_CATS,
+    NUM_PATTERN_CATEGORIES,
     WHITE,
     _adjacent_pairs,
     count_span,
@@ -39,15 +39,15 @@ def get_zobrist(n):
 
 
 class IncrementalEvaluator:
-    """Održava tekuću ocenu pozicije i ažurira je pri svakom potezu u O(4) span-a.
+    """Održava tekuću ocenu pozicije i ažurira je pri svakom potezu u O(4) pravca.
 
-    Deli isti niz (``arr``) sa pretragom i menja ga kroz :meth:`place`/:meth:`remove`.
+    Deli isti niz ('arr') sa pretragom i menja ga kroz 'place'/'remove'.
     Uz brojače obrazaca po perspektivi, održava i kontrolu centra, povezanost,
     skup zauzetih polja i Zobrist heš pozicije.
     """
 
     def __init__(self, arr, weights):
-        """Inicijalizuje evaluator iz zadate pozicije (jednom skenira sve span-ove)."""
+        """Inicijalizuje evaluator iz zadate pozicije (jednom skenira sve pravce)."""
         self.arr = arr
         self.weights = weights
         n = arr.shape[0]
@@ -61,19 +61,19 @@ class IncrementalEvaluator:
             BLACK: [None] * len(self.spans),
             WHITE: [None] * len(self.spans),
         }
-        self.total = {BLACK: np.zeros(NUM_CATS, dtype=np.int64),
-                      WHITE: np.zeros(NUM_CATS, dtype=np.int64)}
+        self.total = {BLACK: np.zeros(NUM_PATTERN_CATEGORIES, dtype=np.int64),
+                      WHITE: np.zeros(NUM_PATTERN_CATEGORIES, dtype=np.int64)}
         self.center = {BLACK: 0.0, WHITE: 0.0}
         self.conn = {BLACK: 0, WHITE: 0}
         self.occupied = set()
         self.hash = 0
 
-        # brojači obrazaca po span-ovima i njihov zbir
+        # brojači obrazaca po pravcima i njihov zbir
         for si, (rows, cols) in enumerate(self.spans):
             span = arr[rows, cols]
             for color in (BLACK, WHITE):
-                opp = WHITE if color == BLACK else BLACK
-                counts = count_span(span, color, opp)
+                opponent = WHITE if color == BLACK else BLACK
+                counts = count_span(span, color, opponent)
                 self.span_counts[color][si] = counts
                 self.total[color] += counts
 
@@ -93,7 +93,7 @@ class IncrementalEvaluator:
         return self.n - (abs(r - self.center_ref) + abs(c - self.center_ref))
 
     def _neighbors(self, r, c, stone):
-        """Broj susednih polja (8 suseda) koja sadrže kamenčić ``stone``."""
+        """Broj susednih polja (8 suseda) koja sadrže kamenčić 'stone'."""
         n, arr, cnt = self.n, self.arr, 0
         for dr, dc in NEIGHBORS:
             rr, cc = r + dr, c + dc
@@ -102,18 +102,18 @@ class IncrementalEvaluator:
         return cnt
 
     def _recompute_cell(self, r, c):
-        """Preračunava brojače obrazaca za sve span-ove koje prolaze kroz (r, c)."""
+        """Preračunava brojače obrazaca za sve pravce koje prolaze kroz (r, c)."""
         for si in self.cell_spans.get((r, c), ()):
             rows, cols = self.spans[si]
             span = self.arr[rows, cols]
             for color in (BLACK, WHITE):
-                opp = WHITE if color == BLACK else BLACK
-                counts = count_span(span, color, opp)
+                opponent = WHITE if color == BLACK else BLACK
+                counts = count_span(span, color, opponent)
                 self.total[color] += counts - self.span_counts[color][si]
                 self.span_counts[color][si] = counts
 
     def place(self, r, c, stone):
-        """Postavlja ``stone`` na (r, c) i inkrementalno ažurira sve pokazatelje."""
+        """Postavlja 'stone' na (r, c) i inkrementalno ažurira sve pokazatelje."""
         self.arr[r, c] = stone
         self.occupied.add((r, c))
         self.center[stone] += self._cell_center(r, c)
@@ -132,16 +132,16 @@ class IncrementalEvaluator:
         self._recompute_cell(r, c)
 
     def value(self, own):
-        """Trenutna ocena pozicije iz ugla igrača ``own`` (bez ponovnog skeniranja)."""
-        opp = WHITE if own == BLACK else BLACK
-        center_diff = self.center[own] - self.center[opp]
-        conn_diff = self.conn[own] - self.conn[opp]
+        """Trenutna ocena pozicije iz ugla igrača 'own' (bez ponovnog skeniranja)."""
+        opponent = WHITE if own == BLACK else BLACK
+        center_diff = self.center[own] - self.center[opponent]
+        conn_diff = self.conn[own] - self.conn[opponent]
         return score_from_counts(
-            self.total[own], self.total[opp], center_diff, conn_diff, self.weights
+            self.total[own], self.total[opponent], center_diff, conn_diff, self.weights
         )
 
     def candidates(self, radius):
-        """Prazna polja u okviru ``radius`` od zauzetih (centar ako je tabla prazna)."""
+        """Prazna polja u okviru 'radius' od zauzetih (centar ako je tabla prazna)."""
         if not self.occupied:
             return [(self.n // 2, self.n // 2)]
         n, arr, cand = self.n, self.arr, set()

@@ -11,9 +11,9 @@ from lib.constants import Stone
 
 def play_game(black_weights, white_weights, depth=1, radius=1, size=15,
               max_moves=None, seed=None):
-    """Odigra jednu partiju; vraća pobednički ``Stone`` ili ``None`` za nerešeno.
+    """Odigra jednu partiju; vraća pobednički 'Stone' ili 'None' za nerešeno.
 
-    Podrazumevano se igra na punoj tabli 15x15; plitka pretraga (``depth=1``)
+    Podrazumevano se igra na punoj tabli 15x15; plitka pretraga ('depth=1')
     drži self-play dovoljno brzim za veliki broj partija koje GA zahteva.
     """
     board = GomokuBoard(size)
@@ -38,14 +38,14 @@ def play_game(black_weights, white_weights, depth=1, radius=1, size=15,
 
 
 def _points(result, playing_as):
-    """Poeni iz jedne partije za boju ``playing_as``: pobeda 1.0, nerešeno 0.5, poraz 0.0."""
+    """Poeni iz jedne partije za boju 'playing_as': pobeda 1.0, nerešeno 0.5, poraz 0.0."""
     if result is None:
         return 0.5
     return 1.0 if result == playing_as else 0.0
 
 
 def match_score(a_weights, b_weights, depth=1, radius=1, size=15, seed=None):
-    """Rezultat ``a`` u meču od dve partije protiv ``b`` (svaka boja po jednom).
+    """Rezultat 'a' u meču od dve partije protiv 'b' (svaka boja po jednom).
 
     Vraća vrednost u [0, 2]: 1 poen po pobedi, 0.5 po nerešenom. Igranje obe
     boje uklanja prednost prvog poteza (crni) iz poređenja.

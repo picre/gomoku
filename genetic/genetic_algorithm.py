@@ -1,7 +1,7 @@
 """Genetski algoritam koji optimizuje težine funkcije evaluacije.
 
 Svaka jedinka je vektor heurističkih težina (videti
-:data:`engine.weights.WEIGHT_FIELDS`). Jedinke igraju partije jedna protiv
+'engine.weights.WEIGHT_FIELDS'). Jedinke igraju partije jedna protiv
 druge; fitnes je broj partija koje osvoje. Kroz generacije, turnirska selekcija,
 uniformno ukrštanje i Gaussova mutacija traže kombinaciju težina koja igra
 najjači Gomoku.
@@ -22,7 +22,7 @@ from genetic.arena import match_score
 
 
 def random_individual(rng, base=None, spread=0.5):
-    """Vektor težina nasumično poremećen oko ``base`` za najviše +/- ``spread``."""
+    """Vektor težina nasumično poremećen oko 'base' za najviše +/- 'spread'."""
     base = base if base is not None else weights_to_vector(DEFAULT_WEIGHTS)
     factors = np.array([rng.uniform(1 - spread, 1 + spread) for _ in base])
     return np.clip(base * factors, 0.0, None)
@@ -45,7 +45,7 @@ def evaluate_population(pop, rng, opponents=3, depth=1, radius=1, size=15):
 
 
 def tournament_select(pop, fitness, rng, k=3):
-    """Bira najsposobniju od ``k`` nasumičnih takmičarki."""
+    """Bira najsposobniju od 'k' nasumičnih takmičarki."""
     idxs = rng.sample(range(len(pop)), min(k, len(pop)))
     best = max(idxs, key=lambda i: fitness[i])
     return pop[best]
@@ -71,8 +71,8 @@ def run_ga(pop_size=12, generations=10, opponents=3, depth=1, radius=1,
            verbose=True):
     """Pokreće genetsku pretragu i snima najbolje pronađene težine.
 
-    Vraća ``(weights, fitness)`` i upisuje najbolje
-    težine u ``out_path`` (podrazumevano projektni ``weights.json``).
+    Vraća '(weights, fitness)' i upisuje najbolje
+    težine u 'out_path' (podrazumevano projektni 'weights.json').
     """
     rng = random.Random(seed)
     base = weights_to_vector(DEFAULT_WEIGHTS)

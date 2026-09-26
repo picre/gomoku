@@ -1,7 +1,7 @@
 """Težine heurističke funkcije evaluacije.
 
 Čuva podrazumevane vrednosti, redosled gena za genetski algoritam i I/O
-prema ``weights.json``. Samo ocena pozicije ostaje u :mod:`engine.evaluation`.
+prema 'weights.json'. Samo ocena pozicije ostaje u 'engine.evaluation'.
 """
 
 import json
@@ -38,7 +38,7 @@ def weights_to_vector(weights):
 
 
 def vector_to_weights(vector):
-    """Inverzna funkcija od :func:`weights_to_vector`."""
+    """Inverzna funkcija od 'weights_to_vector'."""
     return {f: float(vector[i]) for i, f in enumerate(WEIGHT_FIELDS)}
 
 

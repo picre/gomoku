@@ -9,6 +9,11 @@ alwaysApply: true
 
 - Komentari i docstring-ovi na **srpskom** sa dijakriticima (č, ć, š, đ, ž).
 - Kod na engleskom.
+- Za pojmove iz arhitekture koristi srpski termin: **pravac** (ne „span“),
+  **linija**, **smer**. Identifikatore u kodu i dalje piši na engleskom
+  (`span`, `count_span`, …).
+- U komentarima/docstring-ovima identifikatore i tipove stavlja u **jednostruke
+  navodnike**, npr. 'weights', 'own' — ne u backtick-ove.
 
 ## Akademski oblik
 

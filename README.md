@@ -97,6 +97,8 @@ gomoku/
 ├── requirements.txt        # zavisnosti
 ├── setup_env.bat           # pravljenje .venv i instalacija (Windows)
 ├── weights.json            # (opciono) evoluirane težine; pravi ih trening
+├── data/
+│   └── opening_book.json   # mapa sekvenca → sledeći potez (otvaranja)
 ├── lib/
 │   └── constants.py        # enum Stone (BLACK / WHITE / EMPTY)
 ├── engine/
@@ -108,7 +110,7 @@ gomoku/
 │   └── ai.py               # GomokuAI: bira potez koristeći pretragu
 └── genetic/
     ├── arena.py            # self-play: dve jedinke odigraju partiju
-    ├── ga.py               # genetski algoritam (selekcija/ukrštanje/mutacija)
+    ├── genetic_algorithm.py  # genetski algoritam (selekcija/ukrštanje/mutacija)
     └── train.py            # CLI ulazna tačka za trening
 ```
 
@@ -185,20 +187,30 @@ kopira i menja pozicije, pa je to znatno brže.
 
 ### Prepoznavanje obrazaca
 
-Svaki **span** (pravac) table — vrsta, kolona ili dijagonala dužine ≥ 5 — pretvara se
-u nisku iz ugla igrača koga ocenjujemo:
+Svaki **pravac** table — vrsta, kolona ili dijagonala dužine ≥ 5 — pretvara se
+u niz cifara iz ugla igrača koga ocenjujemo (relativno kodiranje, nije Stone):
 
-- `'1'` — sopstveni kamenčić,
-- `'2'` — protivnički kamenčić **ili zid** (ivica table),
-- `'0'` — prazno polje.
+- `1` — sopstveni kamenčić,
+- `2` — protivnički kamenčić **ili zid** (ivica table),
+- `0` — prazno polje.
 
-Span se sa obe strane dopunjava sa `'2'` da bi ivice table brojale kao blokada
+Pravac se sa obe strane dopunjava sa `2` da bi ivice table brojale kao blokada
 (npr. otvorena trojka uz ivicu više nije „otvorena").
 
-Zatim se u svakom span-u broje obrasci iz kataloga `IMPORTANT_PATTERNS`, klizanjem
-**linija** dužine 5 i prozora dužine 6 preko **unapred izračunatih tabela**
-(`_TABLE5`, `_TABLE6`); obrasci se broje sa **preklapanjem** (svaka početna
-pozicija). Više o samoj tehnici u odeljku [Optimizacije pretrage](#optimizacije-pretrage). Kategorije:
+**Suština je ista kao regex:** za svaki klizni prozor dužine 5 ili 6 pita se
+„da li se poklapa sa nekim obrascem iz `IMPORTANT_PATTERNS`?“ (sa preklapanjem —
+svaka početna pozicija). Umesto građenja niski i poziva regularnih izraza u toku
+igre, to se radi **ternarnim kodiranjem i lookup-om**:
+
+1. `_span_to_digits` mapira Stone vrednosti u `0/1/2` (sopstveni / protivnik / prazno)
+   i dodaje zidove;
+2. svaki prozor se sabije u jedan ceo broj u **bazi 3** (`_segment_codes`);
+3. `_TABLE5` / `_TABLE6` unapred, za svaki mogući kod, drže koliko puta koji obrazac
+   pogađa taj prozor — lookup umesto `re.search`.
+
+Rezultat je brojač po kategorijama (`PATTERN_CATEGORIES`), **identičan** onome što
+bi dao regex nad istim pravcem. Više o brzini u
+[Optimizacije pretrage](#optimizacije-pretrage). Kategorije:
 
 | Kategorija    | Značenje                                   | Primeri obrazaca                        |
 | ------------- | ------------------------------------------ | --------------------------------------- |
@@ -210,7 +222,7 @@ pozicija). Više o samoj tehnici u odeljku [Optimizacije pretrage](#optimizacije
 | `open_two`    | otvorena dvojka                            | `001100`, `011000`, `010100`, ...       |
 | `two`         | dvojka                                     | `211000`, `210100`, `010010`, ...       |
 
-`board_counts` prolazi kroz sve span-ove i broji pojave svake kategorije za
+`board_counts` prolazi kroz sve pravce i broji pojave svake kategorije za
 zadatog igrača.
 
 ### Pozicioni faktori
@@ -234,12 +246,12 @@ pa se dodaje `fork * max(0, threats − 1)` — bonus koji postoji tek kada post
 
 ### Konačna formula
 
-Neka su `own_pat` i `opp_pat` zbirovi bodova za obrasce (uključujući fork bonus)
+Neka su `own_pat` i `opponent_pat` zbirovi bodova za obrasce (uključujući fork bonus)
 za mene i za protivnika. Ocena iz mog ugla je:
 
 ```
 value = own_pat
-      − defense * opp_pat
+      − defense * opponent_pat
       + center * (razlika u kontroli centra)
       + connectivity * (razlika u povezanosti)
 ```
@@ -348,7 +360,7 @@ meri se brojem partija koje osvoji protiv drugih jedinki.
   crnim, jednom belim, čime se poništava prednost prvog poteza). Vraća poene za
   `a` u opsegu `[0, 2]` (pobeda 1.0, nerešeno 0.5, poraz 0.0).
 
-### `ga.py` — evolucija
+### `genetic_algorithm.py` — evolucija
 
 Glavna petlja `run_ga(...)` radi sledeće:
 
@@ -460,18 +472,19 @@ Da bi pretraga bila upotrebljiva na 15×15 (i trening izvodljiv), evaluacija i
 minimax koriste nekoliko optimizacija — u `engine/evaluation.py`,
 `engine/incremental.py` i `engine/search.py`:
 
-- **Unapred izračunate tabele obrazaca.** Umesto regularnih izraza, skor svakog
-  mogućeg prozora dužine 5 i 6 (kodiranog u bazi 3) izračunat je jednom u tabele
-  (`_TABLE5`, `_TABLE6`). Prebrojavanje span-a je tada klizanje linija/prozora +
-  sabiranje vektora iz tabele — bez građenja niski i bez regexa. Rezultati su
-  **identični** ranijem regex pristupu (iste kategorije i brojevi).
-- **Koordinate span-ova** (`get_spans` / `get_cell_spans`,
+- **Unapred izračunate tabele obrazaca.** Logika je ista kao regex nad pravcem
+  (klizni prozori + poklapanje sa `IMPORTANT_PATTERNS`), samo bez niski i
+  `re` u toku igre: svaki prozor dužine 5/6 kodira se u bazi 3, a odgovor
+  „koji obrasci pogađaju?“ čita se iz `_TABLE5` / `_TABLE6`. Rezultati su
+  **identični** regex pristupu; razlika je samo brzina (evaluacija se zove u
+  svakom čvoru pretrage i u hiljadama GA partija).
+- **Koordinate pravaca** (`get_spans` / `get_cell_spans`,
   `_SPANS` / `_CELL_SPANS`) — sve vrste, kolone i dijagonale, kao i
-  mapa polje→span, računaju se jednom po veličini table.
+  mapa polje→pravac, računaju se jednom po veličini table.
 - **Inkrementalna (delta) evaluacija** (`IncrementalEvaluator` u
   `engine/incremental.py`) — postavljanje
-  ili uklanjanje kamenčića menja samo **4 span-a** kroz to polje, pa se tekuća
-  ocena (brojači obrazaca, kontrola centra, povezanost) ažurira u O(4) span-ova
+  ili uklanjanje kamenčića menja samo **4 pravca** kroz to polje, pa se tekuća
+  ocena (brojači obrazaca, kontrola centra, povezanost) ažurira u O(4) pravaca
   umesto ponovnog skeniranja cele table u svakom čvoru. Puna
   `evaluate(...)` je zadržana kao referenca i za GA, i daje isti rezultat kao
   inkrementalna `value(...)`.
@@ -493,4 +506,7 @@ interaktivan; `depth=2` je brži ako treba ubrzati igru.
   raspodelu vremena i još jače uređivanje poteza.
 - **Detekcija forsiranih pobeda** kroz neprekidne pretnje (VCT/VCF).
 - **Ko-evolucija / turnir svih protiv svih** za stabilniji fitnes u GA.
-- **Otvaranja** (biblioteka poznatih poteza) za jaču ranu fazu igre.
+- **Otvaranja** — `data/opening_book.json` je mapa `sekvenca → sledeći potez`
+  (prazan ključ = početak partije; algebraic A–P bez I, red 1 = dno). Primer:
+  `"" → F6`, `"F6" → E5`, `"F6,E5" → H6`. Još treba povezati knjigu sa AI
+  agentom u ranoj fazi partije.

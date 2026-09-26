@@ -22,7 +22,7 @@ class GomokuBoard:
         """Postavlja kamenčić trenutnog igrača na (row, col), pamti potez i
         predaje potez protivniku.
 
-        Pozivalac mora da proveri legalnost (npr. ``is_valid_move`` / ``move_attempt``).
+        Pozivalac mora da proveri legalnost (npr. 'is_valid_move' / 'move_attempt').
         """
         self.board[row][col] = self.current_stone
         self.last_move = (row, col)

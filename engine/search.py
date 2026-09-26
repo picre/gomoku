@@ -1,15 +1,15 @@
 """Izbor poteza pomoću Minimax algoritma sa alfa-beta odsecanjem.
 
-Pretraga radi nad običnim ``int`` numpy nizom (za kodiranje videti
-:mod:`engine.evaluation`), a ne nad tablom iz GUI-ja, tako da pozicije mogu da
+Pretraga radi nad običnim 'int' numpy nizom (za kodiranje videti
+'engine.evaluation'), a ne nad tablom iz GUI-ja, tako da pozicije mogu da
 se isprobavaju i poništavaju u mestu bez alociranja objekta table po čvoru.
 Da bi faktor grananja ostao razuman na tabli 15x15, kao kandidati se razmatraju
-samo prazna polja u okviru ``radius`` od nekog postojećeg kamenčića.
+samo prazna polja u okviru 'radius' od nekog postojećeg kamenčića.
 
 Optimizacije koje ubrzavaju pretragu:
 
-* **Inkrementalna evaluacija** (:class:`~engine.incremental.IncrementalEvaluator`) —
-  postavljanje ili uklanjanje kamenčića menja samo 4 span-a kroz to polje.
+* **Inkrementalna evaluacija** ('engine.incremental.IncrementalEvaluator') —
+  postavljanje ili uklanjanje kamenčića menja samo 4 pravca kroz to polje.
 * **Transpoziciona tabela** (Zobrist heš) — kešira ocene pozicija.
 * **Uređivanje poteza** — potezi se sortiraju po plitkoj oceni radi jačeg
   alfa-beta odsecanja.
@@ -17,7 +17,7 @@ Optimizacije koje ubrzavaju pretragu:
 
 import numpy as np
 
-from engine.evaluation import BLACK, CAT_INDEX, EMPTY, WHITE, WIN_LENGTH
+from engine.evaluation import BLACK, WHITE, EMPTY, PATTERN_CATEGORY_INDEX, WIN_LENGTH
 from engine.incremental import IncrementalEvaluator
 
 INF = float("inf")
@@ -29,7 +29,7 @@ _EXACT, _LOWER, _UPPER = 0, 1, 2
 
 
 def board_to_int(board):
-    """Konvertuje :class:`~engine.board.GomokuBoard` u int niz."""
+    """Konvertuje 'engine.board.GomokuBoard' u int niz."""
     n = board.board_size
     arr = np.empty((n, n), dtype=np.int8)
     for r in range(n):
@@ -62,10 +62,10 @@ def _wins(arr, row, col):
 
 
 def candidate_moves(arr, radius=1):
-    """Prazna polja u okviru ``radius`` od nekog kamenčića (centar ako je tabla prazna).
+    """Prazna polja u okviru 'radius' od nekog kamenčića (centar ako je tabla prazna).
 
     Samostalna verzija (npr. za testove); pretraga koristi bržu varijantu iz
-    :class:`~engine.incremental.IncrementalEvaluator` koja održava skup zauzetih polja.
+    'engine.incremental.IncrementalEvaluator' koja održava skup zauzetih polja.
     """
     n = arr.shape[0]
     occupied = np.argwhere(arr != EMPTY)
@@ -107,8 +107,8 @@ class _Searcher:
         jedan kraj, pretraga stane, a drugi kraj i dalje pobeđuje. Zato u listu
         proverava se da li igrač na potezu već ima četvorku / otvorenu četvorku.
         """
-        four_i = CAT_INDEX["four"]
-        open_four_i = CAT_INDEX["open_four"]
+        four_i = PATTERN_CATEGORY_INDEX["four"]
+        open_four_i = PATTERN_CATEGORY_INDEX["open_four"]
         mine = self.ev.total[player]
         if int(mine[open_four_i]) > 0 or int(mine[four_i]) > 0:
             return WIN_SCORE if maximizing else -WIN_SCORE
@@ -118,7 +118,7 @@ class _Searcher:
         return self.ev.value(self.ai)
 
     def search(self, depth, alpha, beta, maximizing, player):
-        """Rekurzivni alfa-beta minimax; vraća ocenu iz ugla ``self.ai``."""
+        """Rekurzivni alfa-beta minimax; vraća ocenu iz ugla 'self.ai'."""
         key = (self.ev.hash, maximizing)
         entry = self.tt.get(key)
         if entry is not None and entry[0] >= depth:
@@ -183,13 +183,13 @@ class _Searcher:
 
 
 def search_best_move(arr, ai_stone, weights, depth=3, radius=1, rng=None):
-    """Bira najbolji potez za ``ai_stone`` na ``arr`` pomoću minimax-a.
+    """Bira najbolji potez za 'ai_stone' na 'arr' pomoću minimax-a.
 
-    Vraća (row, col) torku, ili ``None`` ako nema legalnog poteza. Izjednačeni
-    potezi se biraju pomoću ``rng`` kada je prosleđen, tako da partije nisu
+    Vraća (row, col) torku, ili 'None' ako nema legalnog poteza. Izjednačeni
+    potezi se biraju pomoću 'rng' kada je prosleđen, tako da partije nisu
     potpuno deterministične.
     """
-    opp = WHITE if ai_stone == BLACK else BLACK
+    opponent = WHITE if ai_stone == BLACK else BLACK
     ev = IncrementalEvaluator(arr, weights)
     moves = ev.candidates(radius)
     if not moves:
@@ -224,7 +224,7 @@ def search_best_move(arr, ai_stone, weights, depth=3, radius=1, rng=None):
         if _wins(ev.arr, r, c):
             val = WIN_SCORE + depth
         else:
-            val = searcher.search(depth - 1, -INF, INF, False, opp)
+            val = searcher.search(depth - 1, -INF, INF, False, opponent)
         ev.remove(r, c)
         if val > best:
             best, best_moves = val, [(r, c)]

@@ -13,10 +13,10 @@ class GomokuAI:
     potez. Za primenu poteza zadužena je petlja igre.
 
     Potez se bira Minimax algoritmom + alfa-beta odsecanjem nad heuristikom
-    zasnovanom na obrascima (videti :mod:`engine.search` i
-    :mod:`engine.evaluation`). Heurističke ``weights`` mogu se proslediti
+    zasnovanom na obrascima (videti 'engine.search' i
+    'engine.evaluation'). Heurističke 'weights' mogu se proslediti
     direktno (koristi ih genetski algoritam); u suprotnom se učitavaju
-    evoluirane ``weights.json`` ako postoje, uz vraćanje na razumne
+    evoluirane 'weights.json' ako postoje, uz vraćanje na razumne
     podrazumevane."""
 
     def __init__(

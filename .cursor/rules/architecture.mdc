@@ -5,19 +5,22 @@ alwaysApply: true
 
 # Arhitektura / terminologija
 
-Koristi konzistentna imena u kodu:
+Koristi konzistentna imena u **kodu** (engleski):
 
-| Engleski (kod) | Srpski | Značenje |
-|----------------|--------|----------|
-| `span` | pravac | cela vrsta / kolona / dijagonala |
-| `line` | linija | segment dužine 5 unutar span-a |
+| Engleski (kod) | Srpski (komentari / docs) | Značenje |
+|----------------|---------------------------|----------|
+| `span` | **pravac** | cela vrsta / kolona / dijagonala |
+| `line` | linija | segment dužine 5 unutar pravca |
 | `direction` / `(dr, dc)` | smer | npr. u `board` / `search` |
+
+U komentarima, docstring-ovima i README-u koristi **pravac**, ne „span“.
+Engleski identifikatori (`span`, `count_span`, `get_spans`) ostaju u kodu.
 
 ## Slojevi (orientacija)
 
 - `lib/` — konstante (`Stone`)
 - `engine/board.py` — pravila igre
-- `engine/evaluation.py` — obrasci, puna ocena, span-ovi
+- `engine/evaluation.py` — obrasci, puna ocena, pravci
 - `engine/incremental.py` — inkrementalna ocena za pretragu
 - `engine/search.py` — Minimax + αβ
 - `engine/ai.py` — omotač agenta

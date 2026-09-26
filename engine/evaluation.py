@@ -3,19 +3,19 @@
 Ocena se gradi prepoznavanjem karakterističnih obrazaca na tabli
 (otvorene/zatvorene dvojke, trojke i četvorke, forkovi, plus pozicioni faktori
 kao što su kontrola centra i povezanost kamenčića). Svaki obrazac nosi
-određeni broj poena; težina svakog obrasca čuva se u ``weights`` rečniku kako
+određeni broj poena; težina svakog obrasca čuva se u 'weights' rečniku kako
 bi genetski algoritam mogao da ih podešava.
 
-Tabla se prosleđuje kao mali ``int`` numpy niz sa istim vrednostima kao
-:class:`lib.constants.Stone` (BLACK=0, WHITE=1, EMPTY=2), da bi pretraga mogla
+Tabla se prosleđuje kao mali 'int' numpy niz sa istim vrednostima kao
+'lib.constants.Stone' (BLACK=0, WHITE=1, EMPTY=2), da bi pretraga mogla
 jeftino da kopira i isprobava pozicije, nezavisno od table iz GUI-ja.
 
 Prebrojavanje obrazaca je optimizovano: umesto regularnih izraza koristi se
 **unapred izračunata tabela** za sve moguće linije dužine 5 i prozore dužine 6
-(kodirane u bazi 3). Skeniranje jednog **span**-a / pravca (vrsta/kolona/dijagonala)
+(kodirane u bazi 3). Skeniranje jednog **pravca** (vrsta/kolona/dijagonala)
 svodi se na klizanje tih segmenata i sabiranje vektora iz tabele. Koordinate
-svih span-ova i mapa polje→span čuvaju se u ``_SPANS`` / ``_CELL_SPANS``.
-Težine su u :mod:`engine.weights`.
+svih pravaca i mapa polje→pravac čuvaju se u '_SPANS' / '_CELL_SPANS'.
+Težine su u 'engine.weights'.
 """
 
 import numpy as np
@@ -29,11 +29,11 @@ EMPTY = int(Stone.EMPTY.value)   # 2
 
 WIN_LENGTH = 5
 
-# Katalog obrazaca, iz perspektive igrača koji je na potezu:
+# Katalog obrazaca — relativno kodiranje (nije Stone 0/1/2):
 #   '1' sopstveni kamenčić, '2' protivnički kamenčić ILI zid, '0' prazno polje.
-# Span-ovi (pravci) se sa obe strane dopunjavaju '2' da bi ivice table brojale kao blokada.
-# Terminologija: span = cela vrsta/kolona/dijagonala (pravac);
-#                linija = segment dužine 5 unutar span-a (prozor 6 je za duže obrasce);
+# Pravci se sa obe strane dopunjavaju '2' da bi ivice table brojale kao blokada.
+# Terminologija: pravac (kod: span) = cela vrsta/kolona/dijagonala;
+#                linija = segment dužine 5 unutar pravca (prozor 6 je za duže obrasce);
 #                smer = (dr, dc), npr. u board/search.
 IMPORTANT_PATTERNS = {
     "five": ["11111"],
@@ -45,12 +45,12 @@ IMPORTANT_PATTERNS = {
     "two": ["211000", "000112", "210100", "001012", "010010"],
 }
 
-# uređene kategorije obrazaca (indeks u vektoru brojača); ``fork`` koristi
+# uređene kategorije obrazaca (indeks u vektoru brojača); 'fork' koristi
 # indekse: open_four=1, four=2, open_three=3.
 # ("five", "open_four", "four", "open_three", "three", "open_two", "two")
-CATS = tuple(IMPORTANT_PATTERNS.keys())
-CAT_INDEX = {name: i for i, name in enumerate(CATS)}
-NUM_CATS = len(CATS)
+PATTERN_CATEGORIES = tuple(IMPORTANT_PATTERNS.keys())
+PATTERN_CATEGORY_INDEX = {name: i for i, name in enumerate(PATTERN_CATEGORIES)}
+NUM_PATTERN_CATEGORIES = len(PATTERN_CATEGORIES)
 
 
 # --- unapred izračunate tabele obrazaca -----------------------------------
@@ -59,22 +59,22 @@ def _build_window_table(length):
 
     Za dužinu 5 (linija) ili 6 (duži prozor) prolazi kroz svih 3**length
     mogućih kombinacija 0/1/2 i za svaku proverava koje IMPORTANT_PATTERNS
-    te dužine se poklapaju sa početkom. Rezultat je niz brojača po CATS.
+    te dužine se poklapaju sa početkom. Rezultat je niz brojača po PATTERN_CATEGORIES.
 
-    Kasnije count_span samo izračuna kod i sabere table[code],
+    Kasnije 'count_span' samo izračuna kod i sabere table[code],
     bez poređenja stringova u toku igre.
     """
-    table = np.zeros((3 ** length, NUM_CATS), dtype=np.int64)
+    table = np.zeros((3 ** length, NUM_PATTERN_CATEGORIES), dtype=np.int64)
     for code in range(3 ** length):
         digits, x = [], code
         for _ in range(length):
             digits.append(x % 3)
             x //= 3
         window = "".join("012"[d] for d in digits)  # pozicija 0..L-1
-        for ci, cat in enumerate(CATS):
-            for pat in IMPORTANT_PATTERNS[cat]:
+        for i, pattern_category in enumerate(PATTERN_CATEGORIES):
+            for pat in IMPORTANT_PATTERNS[pattern_category]:
                 if len(pat) == length and window.startswith(pat):
-                    table[code, ci] += 1
+                    table[code, i] += 1
     return table
 
 
@@ -82,21 +82,21 @@ _TABLE5 = _build_window_table(5)  # linije dužine 5
 _TABLE6 = _build_window_table(6)  # prozori dužine 6 (za duže obrasce)
 
 
-# --- span-ovi (pravci) po veličini table (grade se jednom, pa se samo čitaju) ---
-_SPANS = {}       # n -> lista (rows, cols) za sve span-ove
-_CELL_SPANS = {}  # n -> mapa (r, c) -> indeksi span-ova kroz to polje
+# --- pravci po veličini table (grade se jednom, pa se samo čitaju) ---
+_SPANS = {}       # n -> lista (rows, cols) za sve pravce
+_CELL_SPANS = {}  # n -> mapa (r, c) -> indeksi pravaca kroz to polje
 
 
 def _build_spans(n):
-    """Sve vrste, kolone i dijagonale (span-ovi / pravci na kojima može biti pobeda),
+    """Sve vrste, kolone i dijagonale (pravci na kojima može biti pobeda),
     dužine >= WIN_LENGTH, kao (rows, cols) nizovi."""
     raw = []
 
-    # svi horizontalni span-ovi (jedan po vrsti)
+    # svi horizontalni pravci (jedan po vrsti)
     for r in range(n):
         raw.append([(r, c) for c in range(n)])
 
-    # svi vertikalni span-ovi (jedan po koloni)
+    # svi vertikalni pravci (jedan po koloni)
     for c in range(n):
         raw.append([(r, c) for r in range(n)])
 
@@ -149,7 +149,7 @@ def _build_spans(n):
 
 
 def get_spans(n):
-    """Vraća koordinate svih span-ova (pravaca) za tablu veličine ``n``."""
+    """Vraća koordinate svih pravaca za tablu veličine 'n'."""
     if n not in _SPANS:
         spans = _build_spans(n)
         _SPANS[n] = spans
@@ -162,7 +162,7 @@ def get_spans(n):
 
 
 def get_cell_spans(n):
-    """Vraća mapu polje (r, c) → indeksi span-ova koje ga sadrže."""
+    """Vraća mapu polje (r, c) → indeksi pravaca koje ga sadrže."""
     get_spans(n)
     return _CELL_SPANS[n]
 
@@ -172,10 +172,11 @@ def get_cell_spans(n):
 _POW3 = (1, 3, 9, 27, 81, 243)
 
 
-def _span_to_digits(span, own, opp):
-    """Mapira span (pravac) u 0/1/2 i doda zid (2) sa obe strane."""
-    # 1 = own, 2 = opp, 0 = prazno
-    middle = np.where(span == own, 1, np.where(span == opp, 2, 0)).astype(np.int64)
+def _span_to_digits(span, own, opponent):
+    """Mapira pravac u relativno kodiranje obrazaca i dodaje zid (2) sa obe strane."""
+    middle = np.where(
+        span == own, 1, np.where(span == opponent, 2, 0)
+    ).astype(np.int64)
     digits = np.empty(middle.size + 2, dtype=np.int64)
     digits[0] = 2
     digits[-1] = 2
@@ -195,17 +196,17 @@ def _segment_codes(digits, length):
     return code
 
 
-def count_span(span, own, opp):
-    """Broj IMPORTANT_PATTERNS pogodaka na jednom span-u (pravcu), iz ugla ``own``.
+def count_span(span, own, opponent):
+    """Broj IMPORTANT_PATTERNS pogodaka na jednom pravcu, iz ugla 'own'.
 
     Koraci:
-    1. pretvara polja span-a u 0/1/2 i dodaje zidove na krajeve
+    1. pretvara polja pravca u 0/1/2 i dodaje zidove na krajeve
     2. klizi linije dužine 5 i prozore dužine 6
     3. za svaki segment uzima unapred izračunat vektor iz _TABLE5/_TABLE6
-    4. sabira sve pogodke po kategorijama (CATS)
+    4. sabira sve pogodke po kategorijama (PATTERN_CATEGORIES)
     """
-    digits = _span_to_digits(span, own, opp)
-    counts = np.zeros(NUM_CATS, dtype=np.int64)
+    digits = _span_to_digits(span, own, opponent)
+    counts = np.zeros(NUM_PATTERN_CATEGORIES, dtype=np.int64)
 
     if digits.size >= 6:
         counts += _TABLE6[_segment_codes(digits, 6)].sum(axis=0)
@@ -214,19 +215,19 @@ def count_span(span, own, opp):
     return counts
 
 
-def board_counts(arr, own, opp, n=None):
-    """Zbir brojača obrazaca za ``own`` preko svih span-ova cele table."""
+def board_counts(arr, own, opponent, n=None):
+    """Zbir brojača obrazaca za 'own' preko svih pravaca cele table."""
     if n is None:
         n = arr.shape[0]
-    total = np.zeros(NUM_CATS, dtype=np.int64)
+    total = np.zeros(NUM_PATTERN_CATEGORIES, dtype=np.int64)
     for rows, cols in get_spans(n):
-        total += count_span(arr[rows, cols], own, opp)
+        total += count_span(arr[rows, cols], own, opponent)
     return total
 
 
 # --- pozicioni faktori ----------------------------------------------------
 def _adjacent_pairs(mask):
-    """Broj ortogonalno/dijagonalno susednih parova kamenčića u ``mask``."""
+    """Broj ortogonalno/dijagonalno susednih parova kamenčića u 'mask'."""
     m = mask.astype(np.int32)
     pairs = 0
     pairs += int(np.sum(m[:, :-1] & m[:, 1:]))
@@ -236,51 +237,61 @@ def _adjacent_pairs(mask):
     return pairs
 
 
-def _positional(arr, own, opp):
-    """Vraća (razlika u kontroli centra, razlika u povezanosti)."""
+def _positional(arr, own, opponent):
+    """
+    Pozicioni faktori iz ugla 'own': centar i povezanost kao razlike (own − opponent).
+
+    Kontrola centra nagrađuje kamenčiće bliže sredini table; povezanost broji
+    susedne parove (ortogonalno i dijagonalno). Koristi ih 'score_from_counts'.
+    """
     n = arr.shape[0]
     center = (n - 1) / 2.0
 
     def center_score(mask):
-        """Zbir blizine centru za sve kamenčiće u ``mask`` (bliže centru = više)."""
+        """Zbir blizine centru za sve kamenčiće u 'mask' (bliže centru = više)."""
         ys, xs = np.nonzero(mask)
         if ys.size == 0:
             return 0.0
         return float(np.sum(n - (np.abs(ys - center) + np.abs(xs - center))))
 
     own_mask = arr == own
-    opp_mask = arr == opp
-    center_diff = center_score(own_mask) - center_score(opp_mask)
-    conn_diff = _adjacent_pairs(own_mask) - _adjacent_pairs(opp_mask)
+    opponent_mask = arr == opponent
+    center_diff = center_score(own_mask) - center_score(opponent_mask)
+    conn_diff = _adjacent_pairs(own_mask) - _adjacent_pairs(opponent_mask)
     return center_diff, conn_diff
 
 
 # --- sastavljanje ocene iz brojača ----------------------------------------
 def _pattern_weight_vector(weights):
-    """Težine kategorija obrazaca kao numpy vektor (istim redosledom kao CATS)."""
-    return np.array([weights[c] for c in CATS], dtype=float)
+    """Težine kategorija obrazaca kao numpy vektor (redosled kao PATTERN_CATEGORIES)."""
+    return np.array(
+        [weights[pattern_category] for pattern_category in PATTERN_CATEGORIES],
+        dtype=float,
+    )
 
 
 def _fork_bonus(counts, weights):
     """Bonus za višestruke istovremene pretnje (fork), izveden iz brojača."""
-    threats = int(counts[CAT_INDEX["open_three"]]
-                  + counts[CAT_INDEX["four"]]
-                  + 2 * counts[CAT_INDEX["open_four"]])
+    threats = int(counts[PATTERN_CATEGORY_INDEX["open_three"]]
+                  + counts[PATTERN_CATEGORY_INDEX["four"]]
+                  + 2 * counts[PATTERN_CATEGORY_INDEX["open_four"]])
     return weights["fork"] * max(0, threats - 1)
 
 
-def score_from_counts(own_counts, opp_counts, center_diff, conn_diff, weights):
+def score_from_counts(own_counts, opponent_counts, center_diff, conn_diff, weights):
     """Konačna ocena iz brojača obrazaca i pozicionih razlika.
 
-    Zajednička je za punu (:func:`evaluate`) i inkrementalnu evaluaciju, pa su
+    Zajednička je za punu ('evaluate') i inkrementalnu evaluaciju, pa su
     im rezultati uvek identični.
     """
     patw = _pattern_weight_vector(weights)
     own_pat = float(patw.dot(own_counts)) + _fork_bonus(own_counts, weights)
-    opp_pat = float(patw.dot(opp_counts)) + _fork_bonus(opp_counts, weights)
+    opponent_pat = (
+        float(patw.dot(opponent_counts)) + _fork_bonus(opponent_counts, weights)
+    )
     return (
         own_pat
-        - weights["defense"] * opp_pat
+        - weights["defense"] * opponent_pat
         + weights["center"] * center_diff
         + weights["connectivity"] * conn_diff
     )
@@ -288,15 +299,17 @@ def score_from_counts(own_counts, opp_counts, center_diff, conn_diff, weights):
 
 # --- glavna ulazna tačka --------------------------------------------------
 def evaluate(arr, own, weights):
-    """Ocenjuje ``arr`` iz ugla igrača ``own``.
+    """Ocenjuje 'arr' iz ugla igrača 'own'.
 
-    Pozitivne vrednosti idu u korist ``own``; negativne u korist protivnika.
-    Protivnički obrasci se oduzimaju (skalirani ``defense`` težinom) tako da
+    Pozitivne vrednosti idu u korist 'own'; negativne u korist protivnika.
+    Protivnički obrasci se oduzimaju (skalirani 'defense' težinom) tako da
     pretraga prirodno uči i da blokira pretnje, a ne samo da gradi svoje.
     """
     n = arr.shape[0]
-    opp = WHITE if own == BLACK else BLACK
-    own_counts = board_counts(arr, own, opp, n)
-    opp_counts = board_counts(arr, opp, own, n)
-    center_diff, conn_diff = _positional(arr, own, opp)
-    return score_from_counts(own_counts, opp_counts, center_diff, conn_diff, weights)
+    opponent = WHITE if own == BLACK else BLACK
+    own_counts = board_counts(arr, own, opponent, n)
+    opponent_counts = board_counts(arr, opponent, own, n)
+    center_diff, conn_diff = _positional(arr, own, opponent)
+    return score_from_counts(
+        own_counts, opponent_counts, center_diff, conn_diff, weights
+    )
