@@ -302,8 +302,8 @@ def evaluate(arr, own, weights):
     """Ocenjuje 'arr' iz ugla igrača 'own'.
 
     Pozitivne vrednosti idu u korist 'own'; negativne u korist protivnika.
-    Protivnički obrasci se oduzimaju (skalirani 'defense' težinom) tako da
-    pretraga prirodno uči i da blokira pretnje, a ne samo da gradi svoje.
+    Protivnički obrasci se oduzimaju (skalirani 'defense' težinom), pa ocena
+    favorizuje blokadu pretnji, a ne samo gradnju sopstvenih obrazaca.
     """
     n = arr.shape[0]
     opponent = WHITE if own == BLACK else BLACK

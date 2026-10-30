@@ -6,6 +6,8 @@ alwaysApply: true
 # Projekat
 
 - Kod (imena promenljivih, funkcija, klasa, fajlova) piši na **engleskom**.
+- Ispis ka korisniku (`print`, `tqdm` / `desc`, `argparse` help, poruke u
+  konzoli) piši na **engleskom**.
 - Komentare, docstring-ove, README i ostalu dokumentaciju piši na **srpskom**.
 - Koristi **punu** srpsku latinicu sa dijakriticima (č, ć, š, đ, ž).
 - Ne koristi „ošišanu“ latinicu (npr. `citanje` umesto `čitanje`).

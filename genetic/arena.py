@@ -14,24 +14,32 @@ def play_game(black_weights, white_weights, depth=1, radius=1, size=15,
     """Odigra jednu partiju; vraća pobednički 'Stone' ili 'None' za nerešeno.
 
     Podrazumevano se igra na punoj tabli 15x15; plitka pretraga ('depth=1')
-    drži self-play dovoljno brzim za veliki broj partija koje GA zahteva.
+    drži self-play dovoljno brzim za veliki broj partija koje genetski
+    algoritam zahteva.
     """
     board = GomokuBoard(size)
-    black = GomokuAI(seed=seed, depth=depth, radius=radius, weights=black_weights)
+    # bez opening book-a: porede se težine, ne unapred snimljena otvaranja
+    black = GomokuAI(
+        seed=seed, depth=depth, radius=radius, weights=black_weights,
+        use_opening_book=False, force_depth=0,
+    )
     white = GomokuAI(
         seed=None if seed is None else seed + 1,
         depth=depth, radius=radius, weights=white_weights,
+        use_opening_book=False, force_depth=0,
     )
 
+    history = []
     limit = max_moves if max_moves is not None else size * size
     for _ in range(limit):
         agent = black if board.current_stone == Stone.BLACK else white
-        move = agent.choose_move(board)
+        move = agent.choose_move(board, history)
         if move is None:
             if not board.is_a_tie():
-                raise RuntimeError("AI nije vratio potez iako tabla nije puna")
+                raise RuntimeError("AI returned no move though the board is not full")
             break
         board.make_move(*move)
+        history.append(move)
         if board.player_has_won():
             return board.board[board.last_move]
     return None

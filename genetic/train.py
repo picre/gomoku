@@ -1,12 +1,11 @@
 """Ulazna tačka iz komandne linije za evoluciju težina funkcije evaluacije.
 
-Pokreće se iz korena projekta, kao modul ili kao skripta::
+Round-robin turnir (svaki protiv svakog, obe boje); najboljih nekoliko jedinki
+proizvodi sledeću generaciju.
 
-    python -m genetic.train --generations 15 --population 16
-    python genetic/train.py --generations 15 --population 16
+Pokreće se iz korena projekta::
 
-Najbolje pronađene težine upisuju se u 'weights.json' u korenu projekta, koje
-igra (i AI) automatski preuzimaju pri sledećem pokretanju.
+    python -m genetic.train --workers 12 --seed 42
 """
 
 import argparse
@@ -18,59 +17,61 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-# ispisuje UTF-8 (srpska slova) i na Windows konzoli koja podrazumeva cp1252
+# UTF-8 na Windows konzoli (cp1252 podrazumevano)
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except (AttributeError, ValueError):
     pass
 
 from engine.weights import WEIGHTS_PATH
-from genetic.genetic_algorithm import run_ga
+from genetic.genetic_algorithm import run_genetic_algorithm
 
 
 def parse_args(argv=None):
     """Definiše i parsira argumente komandne linije za trening."""
     parser = argparse.ArgumentParser(
-        description="Optimizacija težina Gomoku evaluacije genetskim algoritmom.",
+        description=(
+            "Optimize Gomoku weights via round-robin genetic tournament."
+        ),
     )
     parser.add_argument(
-        "--population", type=int, default=12,
-        help="broj jedinki po generaciji",
+        "--population", type=int, default=10,
+        help="individuals per generation (round-robin)",
     )
     parser.add_argument(
-        "--generations", type=int, default=10, help="broj generacija",
+        "--generations", type=int, default=100, help="number of generations",
     )
     parser.add_argument(
-        "--opponents", type=int, default=3,
-        help="mečeva po jedinki u svakoj generaciji",
-    )
-    parser.add_argument(
-        "--depth", type=int, default=1,
-        help="dubina minimax pretrage tokom self-play-a",
+        "--depth", type=int, default=2,
+        help="minimax depth during self-play",
     )
     parser.add_argument(
         "--radius", type=int, default=1,
-        help="radijus kandidat-poteza oko kamenčića",
+        help="candidate-move radius around stones",
     )
     parser.add_argument(
         "--size", type=int, default=15,
-        help="veličina table za self-play partije",
+        help="board size for self-play games",
     )
     parser.add_argument(
         "--elite", type=int, default=2,
-        help="jedinke koje se prenose nepromenjene",
+        help="top individuals that breed the next generation",
     )
     parser.add_argument(
         "--mutation-rate", type=float, default=0.2,
-        help="verovatnoća mutacije po genu",
+        help="per-gene mutation probability",
+    )
+    parser.add_argument(
+        "--workers", type=int, default=None,
+        help="worker processes for parallel games (default: CPU count)",
     )
     parser.add_argument(
         "--seed", type=int, default=None,
-        help="seme RNG-a radi ponovljivosti",
+        help="RNG seed for reproducibility",
     )
     parser.add_argument(
         "--out", type=str, default=None,
-        help="izlazna JSON putanja (podrazumevano: weights.json)",
+        help="output JSON path (default: weights.json)",
     )
     return parser.parse_args(argv)
 
@@ -79,13 +80,19 @@ def main(argv=None):
     """Pokreće genetsku pretragu sa zadatim argumentima i ispisuje najbolji rezultat."""
     args = parse_args(argv)
     out_path = args.out if args.out is not None else str(WEIGHTS_PATH)
+    workers = args.workers if args.workers is not None else (os.cpu_count() or 1)
+    # partija po generaciji: C(n,2)*2
+    games_per_gen = args.population * (args.population - 1)
 
-    print(f"Evolucija težina: pop={args.population}, gen={args.generations}, "
-          f"dubina={args.depth}, tabla={args.size}x{args.size}")
-    best_weights, best_fit = run_ga(
+    print(
+        f"Weight evolution (round-robin): pop={args.population}, "
+        f"elite={args.elite}, gen={args.generations}, depth={args.depth}, "
+        f"board={args.size}x{args.size}, workers={workers}, "
+        f"games/gen={games_per_gen}"
+    )
+    best_weights, best_fit = run_genetic_algorithm(
         pop_size=args.population,
         generations=args.generations,
-        opponents=args.opponents,
         depth=args.depth,
         radius=args.radius,
         size=args.size,
@@ -93,10 +100,11 @@ def main(argv=None):
         mutation_rate=args.mutation_rate,
         seed=args.seed,
         out_path=out_path,
+        workers=workers,
     )
 
-    print(f"\nNajbolji fitnes: {best_fit:.2f}")
-    print(f"Najbolje težine sačuvane u: {out_path}")
+    print(f"\nBest score: {best_fit:.0f}")
+    print(f"Best weights saved to: {out_path}")
     for name, value in best_weights.items():
         print(f"  {name:>13}: {value:.3f}")
 

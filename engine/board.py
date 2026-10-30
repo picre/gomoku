@@ -5,7 +5,7 @@ from lib.constants import Stone
 
 class GomokuBoard:
     def __init__(self, board_size: int = 15):
-        """Pravi praznu tablu zadate veličine; crni je prvi na potezu."""
+        """Inicijalizuje praznu tablu zadate veličine; crni je prvi na potezu."""
         self.board_size = board_size
         self.board = np.full((board_size, board_size), Stone.EMPTY)
         self.current_stone = Stone.BLACK  # crni igra prvi
@@ -22,7 +22,8 @@ class GomokuBoard:
         """Postavlja kamenčić trenutnog igrača na (row, col), pamti potez i
         predaje potez protivniku.
 
-        Pozivalac mora da proveri legalnost (npr. 'is_valid_move' / 'move_attempt').
+        Pretpostavlja se da je potez legalan (videti 'is_valid_move' /
+        'move_attempt').
         """
         self.board[row][col] = self.current_stone
         self.last_move = (row, col)
@@ -59,6 +60,11 @@ class GomokuBoard:
         return matches
 
     def player_has_won(self):
+        """Vraća True ako poslednji potez formira niz dužine ≥ 5.
+
+        Pravilo je freestyle (≥ 5, uključujući overline). Uslov 'streak >= 5'
+        u telu metode određuje varijantu; tačno pet u nizu zahteva '== 5'.
+        """
         if self.last_move is None:
             raise RuntimeError("provera pobede pre bilo kog poteza")
         row, col = self.last_move
@@ -67,15 +73,14 @@ class GomokuBoard:
             raise RuntimeError(
                 f"last_move ({row}, {col}) pokazuje na prazno polje"
             )
-        # proverava horizontalu, vertikalu i obe dijagonale za 5 u nizu
-        for row_step, col_step in [(0, 1), (1, 0), (1, 1), (1, -1)]:  # 4 smera
-            # streak = postavljeni kamenčić (1) + poklapanja sa jedne strane
-            # + poklapanja sa suprotne strane
+        # proverava horizontalu, vertikalu i obe dijagonale
+        for row_step, col_step in [(0, 1), (1, 0), (1, 1), (1, -1)]:
+            # dužina niza = postavljeni kamenčić + produžeci u oba smera
             streak = (
                 1
                 + self._count_in_direction(row, col, stone, row_step, col_step)
                 + self._count_in_direction(row, col, stone, -row_step, -col_step)
             )
-            if streak >= 5:  # == 5 u nekim verzijama igre
+            if streak >= 5:
                 return True
         return False

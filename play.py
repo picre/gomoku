@@ -90,6 +90,7 @@ class Game:
         self.history = []
         self.winner = None
         self.game_over = False
+        self.ai_phase = None  # "opening" / "tactical" / "search"
         self.state = "play"
         if not human_first:
             self.ai_move()         # AI otvara kao crni
@@ -114,25 +115,40 @@ class Game:
         if not self.board.is_valid_move(row, col):
             return
         self.apply(row, col)
-        print(f"Igrač: ({row}, {col})")
+        print(f"Player: ({row}, {col})")
         self.end_if_finished()
         if not self.game_over:
             self.ai_move()
 
     def ai_move(self):
-        """Traži AI potez i odigrava ga (uz kratku pauzu radi vizuelnog utiska)."""
-        # odmah iscrtava da se prethodni kamenčić vidi pre nego što AI „razmišlja”
+        """Traži AI potez i odigrava ga.
+
+        Knjiga / taktika idu odmah; kratka pauza je samo pre minimax pretrage
+        da se vidi prethodni kamenčić.
+        """
+        # odmah iscrtava da se prethodni kamenčić vidi pre AI poteza / pretrage
         self.draw()
         pygame.display.flip()
-        pygame.time.wait(180)
-        move = self.ai.choose_move(self.board)
+        # prvo jeftin potez (knjiga / forsiranje) — bez veštačkog čekanja
+        move = self.ai.choose_move(
+            self.board, self.history, allow_search=False,
+        )
+        if move is None:
+            pygame.time.wait(180)
+            move = self.ai.choose_move(self.board, self.history)
         if move is None:
             if not self.board.is_a_tie():
-                raise RuntimeError("AI nije vratio potez iako tabla nije puna")
+                raise RuntimeError("AI returned no move though the board is not full")
             self.game_over = True
             return
+        self.ai_phase = self.ai.last_phase
         self.apply(*move)
-        print(f"AI: ({move[0]}, {move[1]})")
+        phase_label = {
+            "opening": "opening (book)",
+            "tactical": "tactical (threat)",
+            "search": "search (mid game)",
+        }.get(self.ai_phase, self.ai_phase)
+        print(f"AI [{phase_label}]: ({move[0]}, {move[1]})")
         self.end_if_finished()
 
     # --- iscrtavanje ------------------------------------------------------
@@ -218,7 +234,17 @@ class Game:
         else:
             your_turn = self.board.current_stone == self.human
             color = "black" if self.human == Stone.BLACK else "white"
-            turn = f"Your turn ({color})" if your_turn else "AI thinking..."
+            phase_ui = {
+                "opening": "early (book)",
+                "tactical": "tactical",
+                "search": "mid (search)",
+            }.get(self.ai_phase)
+            if your_turn:
+                turn = f"Your turn ({color})"
+                if phase_ui:
+                    turn += f"  |  AI: {phase_ui}"
+            else:
+                turn = "AI thinking..."
             msg = f"{turn}    moves: {len(self.history)}   (R: menu)"
         label = self.font.render(msg, True, TEXT)
         self.screen.blit(label, (16, HEIGHT - PANEL + (PANEL - label.get_height()) // 2))
