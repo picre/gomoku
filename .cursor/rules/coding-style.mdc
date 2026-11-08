@@ -18,3 +18,7 @@ alwaysApply: true
 
 - Ciljaj **najviše 100 karaktera**.
 - Duže linije prelomi čitljivo (ne zbog forsiranja jednog izraza).
+
+## Provera
+
+- Pre predaje: `ruff check .` i `python -m pytest` (podešavanja su u `pyproject.toml`).

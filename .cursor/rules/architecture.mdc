@@ -16,7 +16,7 @@ Koristi konzistentna imena u **kodu** (engleski):
 U komentarima, docstring-ovima i README-u koristi **pravac**, ne „span“.
 Engleski identifikatori (`span`, `count_span`, `get_spans`) ostaju u kodu.
 
-## Slojevi (orientacija)
+## Slojevi (orijentacija)
 
 - `lib/` — konstante (`Stone`)
 - `engine/board.py` — pravila igre
@@ -25,7 +25,9 @@ Engleski identifikatori (`span`, `count_span`, `get_spans`) ostaju u kodu.
 - `engine/search.py` — Minimax + αβ
 - `engine/ai.py` — omotač agenta
 - `engine/weights.py` — težine / GA geni
-- `genetic/` — trening težina
-- `play.py` — pygame GUI
+- `genetic/` — trening težina i eksperiment ('head_to_head')
+- `play.py` — pygame GUI (AI potez se računa u pozadinskoj niti)
+- `main.py` — jedina ulazna tačka aplikacije
+- `tests/` — pytest testovi; svaka izmena pravila ili evaluacije prati se testom
 
 Ne uvoditi nove apstrakcije ili pakete bez potrebe; prati postojeću podelu.

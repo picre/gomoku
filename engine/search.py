@@ -13,29 +13,32 @@ Optimizacije koje ubrzavaju pretragu:
 * **Transpoziciona tabela** (Zobrist heš) — kešira ocene pozicija.
 * **Uređivanje poteza** — potezi se sortiraju po plitkoj oceni radi jačeg
   alfa-beta odsecanja.
+
+Taktička analiza ('find_tactical_move') je odvojena od same pretrage: agent
+('engine.ai.GomokuAI') je poziva pre 'search_best_move', pa se forsirani
+potezi ne računaju dvaput.
 """
 
 import numpy as np
 
-from engine.evaluation import BLACK, WHITE, EMPTY, PATTERN_CATEGORY_INDEX, WIN_LENGTH
+from engine.board import DIRECTIONS, WIN_LENGTH
+from engine.evaluation import EMPTY, PATTERN_CATEGORY_INDEX, opponent_of
 from engine.incremental import IncrementalEvaluator
 
 INF = float("inf")
 WIN_SCORE = 10_000_000.0
-DIRECTIONS = [(0, 1), (1, 0), (1, 1), (1, -1)]
+VCF_MOVE_CAP = 20  # VCF razmatra samo prvih K poteza po plitkoj oceni
 
 # oznake za transpozicionu tabelu (tačna vrednost / donja granica / gornja granica)
 _EXACT, _LOWER, _UPPER = 0, 1, 2
 
 
 def board_to_int(board):
-    """Konvertuje 'engine.board.GomokuBoard' u int niz."""
-    n = board.board_size
-    arr = np.empty((n, n), dtype=np.int8)
-    for r in range(n):
-        for c in range(n):
-            arr[r, c] = int(board.board[r][c].value)
-    return arr
+    """Vraća nezavisnu 'int8' kopiju table iz 'engine.board.GomokuBoard'.
+
+    Pretraga menja niz u mestu, pa se tabla iz igre nikada ne prosleđuje direktno.
+    """
+    return board.board.astype(np.int8, copy=True)
 
 
 def _wins(arr, row, col):
@@ -59,26 +62,6 @@ def _wins(arr, row, col):
         if count >= WIN_LENGTH:
             return True
     return False
-
-
-def candidate_moves(arr, radius=1):
-    """Prazna polja u okviru 'radius' od nekog kamenčića (centar ako je tabla prazna).
-
-    Samostalna verzija (npr. za testove); pretraga koristi bržu varijantu iz
-    'engine.incremental.IncrementalEvaluator' koja održava skup zauzetih polja.
-    """
-    n = arr.shape[0]
-    occupied = np.argwhere(arr != EMPTY)
-    if occupied.size == 0:
-        return [(n // 2, n // 2)]
-    cand = set()
-    for row, col in occupied:
-        for dr in range(-radius, radius + 1):
-            for dc in range(-radius, radius + 1):
-                rr, cc = int(row) + dr, int(col) + dc
-                if 0 <= rr < n and 0 <= cc < n and arr[rr, cc] == EMPTY:
-                    cand.add((rr, cc))
-    return list(cand)
 
 
 class _Searcher:
@@ -112,7 +95,7 @@ class _Searcher:
         mine = self.ev.total[player]
         if int(mine[open_four_i]) > 0 or int(mine[four_i]) > 0:
             return WIN_SCORE if maximizing else -WIN_SCORE
-        other = WHITE if player == BLACK else BLACK
+        other = opponent_of(player)
         if int(self.ev.total[other][open_four_i]) > 0:
             return -WIN_SCORE if maximizing else WIN_SCORE
         return self.ev.value(self.ai)
@@ -137,7 +120,7 @@ class _Searcher:
             return self._leaf_value(maximizing, player)
 
         alpha0, beta0 = alpha, beta
-        other = WHITE if player == BLACK else BLACK
+        other = opponent_of(player)
         if depth > 1:
             moves = self._order(moves, player, maximizing)
 
@@ -194,9 +177,6 @@ def _cells_where_wins(ev, stone, moves):
     return cells
 
 
-VCF_MOVE_CAP = 20  # VCF razmatra samo top-K poteza po plitkoj oceni
-
-
 def _top_moves_by_value(ev, player, moves, k, perspective):
     """Prvih 'k' poteza iz 'moves', rangiranih po plitkoj 'ev.value(perspective)'."""
     if k <= 0 or not moves:
@@ -217,15 +197,15 @@ def _find_forced_win(ev, attacker, radius, depth_left):
 
     Forsiranje = pretnja „pobeda sledećim potezom“ (četvorka / otvorena
     četvorka). Protivnik mora da brani; ako ne može sve pretnje odjednom,
-    ili posle odbrane napadač opet forsira do mate — vraća se početni potez.
-    Napadački potezi u VCF-u su ograničeni na top-'VCF_MOVE_CAP' po plitkoj oceni.
+    ili posle odbrane napadač opet forsira do pobede — vraća se početni potez.
+    Napadački potezi u VCF-u su ograničeni na prvih 'VCF_MOVE_CAP' po plitkoj oceni.
     """
     if depth_left <= 0:
         return None
     moves = ev.candidates(radius)
     if not moves:
         return None
-    defender = WHITE if attacker == BLACK else BLACK
+    defender = opponent_of(attacker)
     four_i = PATTERN_CATEGORY_INDEX["four"]
     open_four_i = PATTERN_CATEGORY_INDEX["open_four"]
 
@@ -234,11 +214,11 @@ def _find_forced_win(ev, attacker, radius, depth_left):
     if wins:
         return wins[0]
 
-    # ako branilac već pretnji pobedom, napad ne može da forsira
+    # ako branilac već preti pobedom, napadač ne može da forsira
     if _cells_where_wins(ev, defender, moves):
         return None
 
-    # skupi VCF samo na najboljim plitkim kandidatima
+    # VCF se razmatra samo na najboljim plitkim kandidatima
     attack_moves = _top_moves_by_value(
         ev, attacker, moves, VCF_MOVE_CAP, perspective=attacker,
     )
@@ -302,14 +282,14 @@ def find_tactical_move(ev, ai_stone, radius, force_depth=6):
     Prioritet:
     1. trenutna pobeda
     2. blokada protivničke pretnje „pobeda sledećim potezom“
-    3. niz forsiranih pretnji do pobede (VCF na top-K poteza)
+    3. niz forsiranih pretnji do pobede (VCF nad prvih K poteza)
     4. pravljenje otvorene četvorke
     5. blokada već postojeće protivničke otvorene četvorke
     """
     moves = ev.candidates(radius)
     if not moves:
         return None
-    opponent = WHITE if ai_stone == BLACK else BLACK
+    opponent = opponent_of(ai_stone)
     open_four_i = PATTERN_CATEGORY_INDEX["open_four"]
     force_depth = _adaptive_force_depth(len(moves), force_depth)
 
@@ -323,7 +303,7 @@ def find_tactical_move(ev, ai_stone, radius, force_depth=6):
     if blocks:
         return blocks[0]
 
-    # 3. forsiran niz (VCF) — samo top-K po plitkoj oceni
+    # 3. forsiran niz (VCF) — samo prvih K poteza po plitkoj oceni
     if force_depth > 0:
         forced = _find_forced_win(ev, ai_stone, radius, force_depth)
         if forced is not None:
@@ -337,7 +317,7 @@ def find_tactical_move(ev, ai_stone, radius, force_depth=6):
             return (r, c)
         ev.remove(r, c)
 
-    # 5. protivnik već ima otvorenu četvorku — nađi blokadu
+    # 5. protivnik već ima otvorenu četvorku — traži se blokada
     if int(ev.total[opponent][open_four_i]) > 0:
         for (r, c) in moves:
             ev.place(r, c, ai_stone)
@@ -349,30 +329,24 @@ def find_tactical_move(ev, ai_stone, radius, force_depth=6):
     return None
 
 
-def search_best_move(
-    arr, ai_stone, weights, depth=3, radius=1, rng=None, force_depth=6,
-):
+def search_best_move(arr, ai_stone, weights, depth=3, radius=1, rng=None):
     """Bira najbolji potez za 'ai_stone' na 'arr' pomoću minimax-a.
 
     Vraća (row, col) torku, ili 'None' ako nema legalnog poteza. Izjednačeni
     potezi se biraju pomoću 'rng' kada je prosleđen, tako da partije nisu
-    potpuno deterministične. 'force_depth' kontroliše VCF-pretragu u taktiki.
-    Dubina pretrage se dodatno sužava na širokim pozicijama.
+    potpuno deterministične. Dubina pretrage se dodatno sužava na širokim
+    pozicijama. Pretpostavlja se da je pozivalac prethodno proverio
+    'find_tactical_move'.
     """
-    opponent = WHITE if ai_stone == BLACK else BLACK
+    opponent = opponent_of(ai_stone)
     ev = IncrementalEvaluator(arr, weights)
     moves = ev.candidates(radius)
     if not moves:
         if np.any(arr == EMPTY):
-            raise RuntimeError("nema kandidat-poteza iako tabla nije puna")
+            raise RuntimeError("no candidate moves although the board is not full")
         return None
 
     depth = _adaptive_search_depth(len(moves), depth)
-
-    # hitne / forsirane pretnje — bez potrošnje duboke pretrage
-    tactical = find_tactical_move(ev, ai_stone, radius, force_depth=force_depth)
-    if tactical is not None:
-        return tactical
 
     # uređivanje poteza na korenu po plitkoj oceni
     scored = []

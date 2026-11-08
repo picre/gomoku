@@ -1,8 +1,9 @@
 """Inkrementalna evaluacija pozicije tokom pretrage.
 
 'IncrementalEvaluator' održava brojače obrazaca, kontrolu centra,
-povezanost, skup zauzetih polja i Zobrist heš, i ažurira ih u O(4) pravca pri
-svakom 'place'/'remove'. Koristi ga Minimax u 'engine.search'.
+povezanost, skup zauzetih polja i Zobrist heš, i ažurira ih pri
+svakom 'place'/'remove' preračunavanjem samo četiri pravca kroz to
+polje. Koristi ga Minimax u 'engine.search'.
 """
 
 import random
@@ -14,10 +15,11 @@ from engine.evaluation import (
     EMPTY,
     NUM_PATTERN_CATEGORIES,
     WHITE,
-    _adjacent_pairs,
+    adjacent_pairs,
     count_span,
     get_cell_spans,
     get_spans,
+    opponent_of,
     score_from_counts,
 )
 
@@ -39,7 +41,8 @@ def get_zobrist(n):
 
 
 class IncrementalEvaluator:
-    """Održava tekuću ocenu pozicije i ažurira je pri svakom potezu u O(4) pravca.
+    """Održava tekuću ocenu pozicije i ažurira je pri svakom
+    potezu preračunavanjem samo četiri pravca kroz izmenjeno polje.
 
     Deli isti niz ('arr') sa pretragom i menja ga kroz 'place'/'remove'.
     Uz brojače obrazaca po perspektivi, održava i kontrolu centra, povezanost,
@@ -72,7 +75,7 @@ class IncrementalEvaluator:
         for si, (rows, cols) in enumerate(self.spans):
             span = arr[rows, cols]
             for color in (BLACK, WHITE):
-                opponent = WHITE if color == BLACK else BLACK
+                opponent = opponent_of(color)
                 counts = count_span(span, color, opponent)
                 self.span_counts[color][si] = counts
                 self.total[color] += counts
@@ -86,7 +89,7 @@ class IncrementalEvaluator:
             self.hash ^= self.zob[r][c][stone]
         # povezanost (broj susednih parova) po boji
         for color in (BLACK, WHITE):
-            self.conn[color] = _adjacent_pairs(arr == color)
+            self.conn[color] = adjacent_pairs(arr == color)
 
     def _cell_center(self, r, c):
         """Doprinos jednog polja kontroli centra (bliže centru = veći)."""
@@ -107,7 +110,7 @@ class IncrementalEvaluator:
             rows, cols = self.spans[si]
             span = self.arr[rows, cols]
             for color in (BLACK, WHITE):
-                opponent = WHITE if color == BLACK else BLACK
+                opponent = opponent_of(color)
                 counts = count_span(span, color, opponent)
                 self.total[color] += counts - self.span_counts[color][si]
                 self.span_counts[color][si] = counts
@@ -133,7 +136,7 @@ class IncrementalEvaluator:
 
     def value(self, own):
         """Trenutna ocena pozicije iz ugla igrača 'own' (bez ponovnog skeniranja)."""
-        opponent = WHITE if own == BLACK else BLACK
+        opponent = opponent_of(own)
         center_diff = self.center[own] - self.center[opponent]
         conn_diff = self.conn[own] - self.conn[opponent]
         return score_from_counts(

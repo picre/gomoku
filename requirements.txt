@@ -1,4 +1,7 @@
-numpy
-tqdm
-scipy
-pygame
+# izvršne zavisnosti
+numpy>=1.26,<3
+pygame>=2.5,<3
+tqdm>=4.66,<5
+
+# testovi
+pytest>=8,<10

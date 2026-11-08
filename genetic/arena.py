@@ -1,7 +1,8 @@
-"""Dva kandidat-skupa težina odigravaju punu partiju jedan protiv drugog.
+"""Partija između dva agenta sa različitim skupovima težina (samoigra).
 
-Koristi ga genetski algoritam za merenje fitnesa: jedinka vredi onoliko koliko
-partija može da dobije, pa se agenti sučeljavaju direktno, a pobednik osvaja poene.
+Koristi je genetski algoritam za merenje fitnesa: jedinka vredi onoliko koliko
+partija može da dobije, pa se agenti sučeljavaju direktno. Isti mehanizam
+koristi i eksperiment 'genetic.head_to_head'.
 """
 
 from engine.ai import GomokuAI
@@ -11,14 +12,14 @@ from lib.constants import Stone
 
 def play_game(black_weights, white_weights, depth=1, radius=1, size=15,
               max_moves=None, seed=None):
-    """Odigra jednu partiju; vraća pobednički 'Stone' ili 'None' za nerešeno.
+    """Odigrava jednu partiju; vraća pobednički 'Stone' ili 'None' za nerešeno.
 
     Podrazumevano se igra na punoj tabli 15x15; plitka pretraga ('depth=1')
-    drži self-play dovoljno brzim za veliki broj partija koje genetski
-    algoritam zahteva.
+    drži samoigru dovoljno brzom za veliki broj partija koje genetski
+    algoritam zahteva. Knjiga otvaranja i VCF forsiranje su isključeni, kako
+    bi ishod zavisio samo od težina funkcije evaluacije.
     """
     board = GomokuBoard(size)
-    # bez opening book-a: porede se težine, ne unapred snimljena otvaranja
     black = GomokuAI(
         seed=seed, depth=depth, radius=radius, weights=black_weights,
         use_opening_book=False, force_depth=0,
@@ -41,23 +42,12 @@ def play_game(black_weights, white_weights, depth=1, radius=1, size=15,
         board.make_move(*move)
         history.append(move)
         if board.player_has_won():
-            return board.board[board.last_move]
+            return board.stone_at(*board.last_move)
     return None
 
 
-def _points(result, playing_as):
-    """Poeni iz jedne partije za boju 'playing_as': pobeda 1.0, nerešeno 0.5, poraz 0.0."""
+def outcome_for(result, stone):
+    """Ishod partije iz ugla boje 'stone': +1 pobeda, -1 poraz, 0 nerešeno."""
     if result is None:
-        return 0.5
-    return 1.0 if result == playing_as else 0.0
-
-
-def match_score(a_weights, b_weights, depth=1, radius=1, size=15, seed=None):
-    """Rezultat 'a' u meču od dve partije protiv 'b' (svaka boja po jednom).
-
-    Vraća vrednost u [0, 2]: 1 poen po pobedi, 0.5 po nerešenom. Igranje obe
-    boje uklanja prednost prvog poteza (crni) iz poređenja.
-    """
-    as_black = play_game(a_weights, b_weights, depth, radius, size, seed=seed)
-    as_white = play_game(b_weights, a_weights, depth, radius, size, seed=seed)
-    return _points(as_black, Stone.BLACK) + _points(as_white, Stone.WHITE)
+        return 0
+    return 1 if result == stone else -1

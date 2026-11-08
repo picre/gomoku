@@ -1,7 +1,7 @@
 """Statička ocena Gomoku pozicije.
 
 Ocena se gradi prepoznavanjem karakterističnih obrazaca na tabli
-(otvorene/zatvorene dvojke, trojke i četvorke, forkovi, plus pozicioni faktori
+(otvorene/zatvorene dvojke, trojke i četvorke, višestruke pretnje, plus pozicioni faktori
 kao što su kontrola centra i povezanost kamenčića). Svaki obrazac nosi
 određeni broj poena; težina svakog obrasca čuva se u 'weights' rečniku kako
 bi genetski algoritam mogao da ih podešava.
@@ -20,14 +20,19 @@ Težine su u 'engine.weights'.
 
 import numpy as np
 
+from engine.board import WIN_LENGTH
 from lib.constants import Stone
 
 # --- kodiranje kamenčića (poklapa se sa vrednostima Stone enum-a) ---------
-BLACK = int(Stone.BLACK.value)   # 0
-WHITE = int(Stone.WHITE.value)   # 1
-EMPTY = int(Stone.EMPTY.value)   # 2
+BLACK = int(Stone.BLACK)   # 0
+WHITE = int(Stone.WHITE)   # 1
+EMPTY = int(Stone.EMPTY)   # 2
 
-WIN_LENGTH = 5
+
+def opponent_of(stone):
+    """Vraća kod protivničke boje za kod 'stone' (BLACK ↔ WHITE)."""
+    return WHITE if stone == BLACK else BLACK
+
 
 # Katalog obrazaca — relativno kodiranje (nije Stone 0/1/2):
 #   '1' sopstveni kamenčić, '2' protivnički kamenčić ILI zid, '0' prazno polje.
@@ -55,7 +60,7 @@ NUM_PATTERN_CATEGORIES = len(PATTERN_CATEGORIES)
 
 # --- unapred izračunate tabele obrazaca -----------------------------------
 def _build_window_table(length):
-    """Lookup tabela: kod segmenta -> broj pogodaka po kategoriji.
+    """Tabela pretraživanja: kod segmenta → broj pogodaka po kategoriji.
 
     Za dužinu 5 (linija) ili 6 (duži prozor) prolazi kroz svih 3**length
     mogućih kombinacija 0/1/2 i za svaku proverava koje IMPORTANT_PATTERNS
@@ -100,7 +105,7 @@ def _build_spans(n):
     for c in range(n):
         raw.append([(r, c) for r in range(n)])
 
-    # dijagonale nadole-desno (\/ smer), koje počinju u gornjem redu
+    # dijagonale nadole-desno (smer (1, 1)), koje počinju u gornjem redu
     for start in range(n):
         coords, r, c = [], 0, start
         while r < n and c < n:
@@ -120,7 +125,7 @@ def _build_spans(n):
         if len(coords) >= WIN_LENGTH:
             raw.append(coords)
 
-    # anti-dijagonale nadole-levo (/\ smer), koje počinju u gornjem redu
+    # anti-dijagonale nadole-levo (smer (1, -1)), koje počinju u gornjem redu
     for start in range(n):
         coords, r, c = [], 0, start
         while r < n and c >= 0:
@@ -140,7 +145,8 @@ def _build_spans(n):
         if len(coords) >= WIN_LENGTH:
             raw.append(coords)
 
-    # pretvara listu (row, col) parova u dva numpy niza radi brzog indeksiranja table (np.where oblik)
+    # pretvara listu (row, col) parova u dva numpy niza radi brzog
+    # indeksiranja table (oblik koji vraća 'np.where')
     spans = []
     for coords in raw:
         rows, cols = zip(*coords)
@@ -226,7 +232,7 @@ def board_counts(arr, own, opponent, n=None):
 
 
 # --- pozicioni faktori ----------------------------------------------------
-def _adjacent_pairs(mask):
+def adjacent_pairs(mask):
     """Broj ortogonalno/dijagonalno susednih parova kamenčića u 'mask'."""
     m = mask.astype(np.int32)
     pairs = 0
@@ -257,7 +263,7 @@ def _positional(arr, own, opponent):
     own_mask = arr == own
     opponent_mask = arr == opponent
     center_diff = center_score(own_mask) - center_score(opponent_mask)
-    conn_diff = _adjacent_pairs(own_mask) - _adjacent_pairs(opponent_mask)
+    conn_diff = adjacent_pairs(own_mask) - adjacent_pairs(opponent_mask)
     return center_diff, conn_diff
 
 
@@ -271,7 +277,7 @@ def _pattern_weight_vector(weights):
 
 
 def _fork_bonus(counts, weights):
-    """Bonus za višestruke istovremene pretnje (fork), izveden iz brojača."""
+    """Bonus za višestruke istovremene pretnje (gen 'fork'), izveden iz brojača."""
     threats = int(counts[PATTERN_CATEGORY_INDEX["open_three"]]
                   + counts[PATTERN_CATEGORY_INDEX["four"]]
                   + 2 * counts[PATTERN_CATEGORY_INDEX["open_four"]])
@@ -306,7 +312,7 @@ def evaluate(arr, own, weights):
     favorizuje blokadu pretnji, a ne samo gradnju sopstvenih obrazaca.
     """
     n = arr.shape[0]
-    opponent = WHITE if own == BLACK else BLACK
+    opponent = opponent_of(own)
     own_counts = board_counts(arr, own, opponent, n)
     opponent_counts = board_counts(arr, opponent, own, n)
     center_diff, conn_diff = _positional(arr, own, opponent)

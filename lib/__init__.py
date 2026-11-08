@@ -1,0 +1,1 @@
+"""Zajedničke konstante projekta."""

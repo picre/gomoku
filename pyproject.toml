@@ -1,0 +1,22 @@
+[project]
+name = "gomoku"
+version = "1.0.0"
+description = "Gomoku agent: Minimax sa alfa-beta odsecanjem i genetska optimizacija heuristike"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26,<3",
+    "pygame>=2.5,<3",
+    "tqdm>=4.66,<5",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B"]
+ignore = ["B905"]  # zip() nad nizovima iste dužine po konstrukciji

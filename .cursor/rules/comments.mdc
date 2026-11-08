@@ -31,6 +31,6 @@ alwaysApply: true
 ## Imena
 
 - Razumljiva imena (`span`, `count_span`, `weights`).
-- Bez kryptičnih skraćenica (`tmp2`, `x1`), osim gde je lokalno i očigledno
+- Bez kriptičnih skraćenica (`tmp2`, `x1`), osim gde je lokalno i očigledno
   (`r`, `c` za red/kolonu; `n` za veličinu table).
 - Preferirati jasne, kraće funkcije umesto gustih one-liner-a.
